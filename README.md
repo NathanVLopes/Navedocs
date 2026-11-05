@@ -87,3 +87,11 @@ O CPF, nome e documentos são dados pessoais. Nada é transmitido a serviços de
 Este pacote está **preparado**, mas não foi publicado. Requer uma conta Railway conectada e a criação explícita de um serviço. Configure: `ADMIN_USER` e `ADMIN_PASSWORD` únicos, `STAGING=1`, `ENABLE_TEST_UPLOADS=0`, `NAVEDOCS_PRIVATE_DIR=/data`, `TRUST_PROXY=1` (somente atrás do proxy HTTPS confiável do provedor). Monte um volume persistente em `/data` **antes** de permitir uploads. Dados do SQLite e anexos não devem viver no filesystem efêmero. Configure URL HTTPS pública pelo painel da hospedagem.
 
 Por padrão, a página do cidadão pode ser visualizada, mas o envio retorna HTTP 503 em homologação. Para testes end-to-end sob responsabilidade da equipe, mude `ENABLE_TEST_UPLOADS=1` e use **apenas dados sintéticos**, nunca CPFs ou documentos reais. Volte para `0` após os testes. Não libere o uso público sem auditoria e política de dados. O sistema não inclui contas individuais nem autorização granular e a configuração atual **não está homologada para uso real**.
+
+
+## Atualização v0.1.2 — Homologação restrita
+
+- Permite provisionar **uma conta administrativa adicional** por `NAVEDOCS_EXTRA_ADMIN_USER` e `NAVEDOCS_EXTRA_ADMIN_PASSWORD` do Railway. Cria a conta somente se ainda não existe; não modifica senhas já registradas. Em homologação requer 8 caracteres; fora da homologação requer no mínimo 14. A senha nunca deve ser salva no GitHub.
+- Para habilitar envios de teste, manter `STAGING=1` e definir `ENABLE_TEST_UPLOADS=1`. **Somente o CPF fictício `000.000.000-00` é aceito no modo de testes.** Não envie informações pessoais reais, fotografias pessoais ou documentos verdadeiros.
+- O código continua em avaliação, não está homologado para produção com documentos pessoais; faltam testes de segurança, mecanismos antimalware e políticas formais de tratamento/retencão de dados.
+- No Railway, os arquivos `server.js`, `package.json`, `railway.json` e a pasta `public/` devem ficar na raiz do repositório. Envie os arquivos extraídos, não o ZIP.

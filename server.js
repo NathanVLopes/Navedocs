@@ -32,6 +32,20 @@ if(!db.prepare('SELECT 1 FROM users LIMIT 1').get()){
  db.prepare('INSERT INTO users(username,password_hash) VALUES (?,?)').run(username,hashPassword(password));
  console.log('Usuário administrador inicial criado.');
 }
+// Conta administrativa adicional: credenciais somente em variáveis do Railway.
+// Não altera contas existentes nem substitui dados persistidos.
+const extraAdminUser=String(process.env.NAVEDOCS_EXTRA_ADMIN_USER||'').trim();
+const extraAdminPassword=process.env.NAVEDOCS_EXTRA_ADMIN_PASSWORD||'';
+if(extraAdminUser||extraAdminPassword){
+  if(!/^[A-Za-z0-9_.-]{3,40}$/.test(extraAdminUser)||extraAdminPassword.length<(process.env.STAGING==='1'?8:14)){
+    console.error('Configuração da conta administrativa adicional inválida.');
+    process.exit(1);
+  }
+  if(!db.prepare('SELECT id FROM users WHERE username=?').get(extraAdminUser)){
+    db.prepare('INSERT INTO users(username,password_hash,role) VALUES (?,?,?)').run(extraAdminUser,hashPassword(extraAdminPassword),'admin');
+    console.log('Conta administrativa adicional criada.');
+  }
+}
 const app=express();app.disable('x-powered-by');
 if(process.env.STAGING==='1') app.use((req,res,next)=>{res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive');next();});
 if(process.env.TRUST_PROXY==='1') app.set('trust proxy',1);
@@ -54,7 +68,10 @@ const upload=multer({storage:multer.memoryStorage(),limits:{files:8,fileSize:10*
 function detect(buffer){if(buffer.length<16)return null;if(buffer.subarray(0,5).toString()==='%PDF-')return {mime:'application/pdf',ext:'.pdf'};if(buffer.subarray(0,3).equals(Buffer.from([0xff,0xd8,0xff])))return {mime:'image/jpeg',ext:'.jpg'};if(buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return {mime:'image/png',ext:'.png'};return null;}
 function cleanup(names){for(const name of names)try{unlinkSync(path.join(storageDir,name));}catch{}}
 app.post('/api/requests', (req,res,next)=>{if(process.env.STAGING==='1' && process.env.ENABLE_TEST_UPLOADS!=='1')return res.status(503).json({error:'Ambiente de demonstração: recebimento desativado. Não envie dados reais.'});next();},publicLimit,upload.array('documents',8),(req,res)=>{const cpf=normalizeCpf(req.body.cpf),name=String(req.body.name||'').trim(),service=String(req.body.service||'');const files=req.files||[];
- if(name.length<3||name.length>120||!validCpf(cpf)||!SERVICES.includes(service)||!files.length)return res.status(400).json({error:'Confira nome, CPF, tipo de solicitação e anexos.'});
+ // Homologação: nenhum CPF válido é aceito para testes; use apenas o marcador fictício.
+ const demoRequest=process.env.STAGING==='1'&&process.env.ENABLE_TEST_UPLOADS==='1';
+ if(demoRequest&&cpf!=='00000000000')return res.status(400).json({error:'Homologação: use apenas o CPF fictício 000.000.000-00. Não envie dados reais.'});
+ if(name.length<3||name.length>120||!(validCpf(cpf)||(demoRequest&&cpf==='00000000000'))||!SERVICES.includes(service)||!files.length)return res.status(400).json({error:'Confira nome, CPF, tipo de solicitação e anexos.'});
  if(files.some(f=>!detect(f.buffer)))return res.status(400).json({error:'Arquivos aceitos: PDF, JPG e PNG válidos.'});
  const inserted=[];let id;const now=new Date().toISOString();const protocol='NAV-'+new Date().getUTCFullYear()+'-'+randomBytes(5).toString('hex').toUpperCase();
  try{db.exec('BEGIN IMMEDIATE');let a=db.prepare('INSERT INTO requests(protocol,citizen_name,cpf,service,created_at,updated_at) VALUES (?,?,?,?,?,?)').run(protocol,name,cpf,service,now,now);id=Number(a.lastInsertRowid);
