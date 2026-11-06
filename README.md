@@ -95,3 +95,13 @@ Por padrão, a página do cidadão pode ser visualizada, mas o envio retorna HTT
 - Para habilitar envios de teste, manter `STAGING=1` e definir `ENABLE_TEST_UPLOADS=1`. **Somente o CPF fictício `000.000.000-00` é aceito no modo de testes.** Não envie informações pessoais reais, fotografias pessoais ou documentos verdadeiros.
 - O código continua em avaliação, não está homologado para produção com documentos pessoais; faltam testes de segurança, mecanismos antimalware e políticas formais de tratamento/retencão de dados.
 - No Railway, os arquivos `server.js`, `package.json`, `railway.json` e a pasta `public/` devem ficar na raiz do repositório. Envie os arquivos extraídos, não o ZIP.
+
+
+## PWA — versão 0.1.3 (homologação)
+
+- Para instalar no Android/desktop: abra o portal pelo HTTPS e use **Instalar aplicativo**, quando o navegador disponibilizar essa opção, ou o menu de instalação do navegador.
+- No Safari do iPhone: abra o portal, toque em **Compartilhar** e escolha **Adicionar à Tela de Início** (a opção depende da versão do iOS).
+- O PWA abre o **portal do cidadão** por padrão. A área administrativa permanece em `/admin` e também consta como atalho do manifesto.
+- Serviço offline guarda apenas arquivos visuais estáticos e página de conexão indisponível. Jamais guarda PDFs, CPF, sessões, formulários ou conteúdo das APIs. Envio depende de conexão ativa.
+- O novo aplicativo precisa ser servido em HTTPS e testado no navegador. As mudanças deste pacote **não** foram publicadas automaticamente no Railway.
+- Para publicar corretamente, mantenha `server.js`, `package.json`, `railway.json` na raiz e todos os arquivos web dentro de `public/`. A configuração de comando temporário do Railway que copia arquivos da raiz pode permanecer até a organização do repositório ser corrigida.
