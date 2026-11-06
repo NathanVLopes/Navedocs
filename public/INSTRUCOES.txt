@@ -1,0 +1,11 @@
+NAVEDOCS — atualização da logo do PWA v0.1.5
+
+Somente identidade visual, sem alterações em backend, permissões ou banco.
+
+Envie os arquivos e ícones deste pacote para a pasta public/ do repositório NathanVLopes/Navedocs, substituindo os existentes com os mesmos nomes.
+
+IMPORTANTE: não envie os arquivos para a raiz.
+O app existente talvez precise ser fechado/reinstalado para atualizar o ícone da tela inicial do dispositivo.
+O PWA continua em homologação; não envie dados pessoais reais.
+
+Arquivos alterados: public/index.html; public/admin.html; public/sw.js; public/manifest.webmanifest; public/icon-192.png; public/icon-512.png; public/icon-maskable-512.png; public/apple-touch-icon.png; public/favicon.png.

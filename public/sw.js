@@ -1,6 +1,6 @@
 /* NAVEDOCS PWA — apenas recursos públicos estáticos. Nunca armazenar dados pessoais. */
-const CACHE = 'navedocs-static-v013';
-const ASSETS = ['/styles.css','/navetran.svg','/icon-192.png','/icon-512.png','/offline.html'];
+const CACHE = 'navedocs-static-v015';
+const ASSETS = ['/styles.css','/navetran.svg','/icon-192.png','/icon-512.png','/icon-maskable-512.png','/favicon.png','/apple-touch-icon.png','/offline.html'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
   self.skipWaiting();
