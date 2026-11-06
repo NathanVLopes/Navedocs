@@ -1,0 +1,34 @@
+{
+  "name": "NAVEDOCS — Gestão de Documentos | NAVETRAN",
+  "short_name": "NAVEDOCS",
+  "description": "Portal de envio de documentos da NAVETRAN. Ambiente de homologação.",
+  "lang": "pt-BR",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#102d4b",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Painel administrativo",
+      "short_name": "Admin",
+      "url": "/admin",
+      "description": "Acessar a área administrativa da NAVETRAN"
+    }
+  ]
+}
