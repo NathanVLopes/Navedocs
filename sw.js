@@ -1,7 +1,7 @@
 
 const CACHE = 'navedocs-shell-v2';
 
-const ASSETS = [
+const ASSETS = [ 
   '/styles.css',
   '/navetran.svg',
   '/icon-192.png',
