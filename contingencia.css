@@ -1,0 +1,154 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background: #eef2f7;
+  color: #263445;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.container {
+  width: 100%;
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 30px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+.header {
+  text-align: center;
+  padding-bottom: 20px;
+  border-bottom: 3px solid #12345a;
+}
+
+.header h1 {
+  margin: 0;
+  color: #12345a;
+  font-size: 30px;
+  letter-spacing: 2px;
+}
+
+.header h2 {
+  margin-bottom: 5px;
+}
+
+.header p {
+  color: #667085;
+}
+
+.alerta {
+  margin: 22px 0;
+  padding: 15px;
+  background: #fff4df;
+  border-left: 5px solid #d99120;
+  border-radius: 5px;
+  line-height: 1.5;
+}
+
+form h3 {
+  margin-top: 28px;
+  padding-bottom: 9px;
+  color: #12345a;
+  border-bottom: 1px solid #dce3eb;
+}
+
+label {
+  display: block;
+  margin: 15px 0 7px;
+  font-weight: 600;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #8bb7e5;
+  border-color: #2463a6;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.confirmacao {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 25px 0;
+  line-height: 1.5;
+}
+
+.confirmacao input {
+  width: auto;
+  margin-top: 4px;
+}
+
+button {
+  width: 100%;
+  padding: 15px;
+  border: 0;
+  border-radius: 6px;
+  background: #12345a;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4d80;
+}
+
+footer {
+  margin-top: 30px;
+  padding-top: 15px;
+  border-top: 1px solid #dce3eb;
+  text-align: center;
+  color: #667085;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  body {
+    padding: 10px;
+  }
+
+  .container {
+    padding: 18px;
+  }
+}
+
+@media print {
+  body {
+    padding: 0;
+    background: white;
+  }
+
+  .container {
+    max-width: none;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  form,  
+  footer,
+  .alerta {
+    display: none !important;
+  }
+}

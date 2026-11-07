@@ -1,0 +1,98 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#12345a">
+  <title>Protocolo de Contingência | NAVETRAN</title>
+  <link rel="stylesheet" href="contingencia.css">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>NAVETRAN</h1>
+      <h2>Protocolo de Contingência</h2>
+      <p>Registro provisório de atendimento</p>
+    </header>
+
+    <section class="alerta">
+      <strong>ATENÇÃO:</strong>
+      Utilize este formulário somente quando o sistema oficial
+      estiver indisponível, conforme autorização da administração.
+    </section>
+
+    <form id="formContingencia">
+      <h3>1. Identificação do atendimento</h3>
+
+      <label for="numero">Número provisório</label>
+      <input id="numero" name="numero" required
+        placeholder="Preencher conforme controle manual">
+
+      <label for="data">Data e hora</label>
+      <input id="data" name="data" type="datetime-local" required>
+
+      <label for="servidor">Servidor responsável</label>
+      <input id="servidor" name="servidor" required>
+
+      <h3>2. Dados do cidadão</h3>
+
+      <label for="nome">Nome fictício para teste</label>
+      <input id="nome" name="nome" required>
+
+      <label for="cpf">CPF de teste</label>
+      <input id="cpf" name="cpf" value="000.000.000-00"
+        readonly required>
+
+      <label for="contato">Contato (opcional)</label>
+      <input id="contato" name="contato"
+        placeholder="Contato fictício">
+
+      <h3>3. Tipo de atendimento</h3>
+
+      <label for="servico">Serviço solicitado</label>
+      <select id="servico" name="servico" required>
+        <option value="">Selecione</option>
+        <option>Defesa de autuação</option>
+        <option>Indicação de condutor</option>
+        <option>Outro atendimento</option>
+      </select>
+      
+      <label for="placa">Placa do veículo (se aplicável)</label>
+      <input id="placa" name="placa">
+
+      <label for="ait">Número do AIT (se aplicável)</label>
+      <input id="ait" name="ait">
+
+      <h3>4. Documentação recebida</h3>
+
+      <label for="documentos">Documentos apresentados</label>
+      <textarea id="documentos" name="documentos"
+        rows="4" required></textarea>
+
+      <label for="quantidade">Quantidade de documentos</label>
+      <input id="quantidade" name="quantidade"
+        type="number" min="0" required>
+
+      <label for="motivo">Motivo da contingência e observações</label>
+      <textarea id="motivo" name="motivo"
+        rows="4" required></textarea>
+
+      <label class="confirmacao">
+        <input type="checkbox" id="teste" required>
+        Confirmo que estou utilizando exclusivamente dados fictícios.
+      </label>
+
+      <button type="submit">Gerar duas vias para impressão</button>
+    </form>
+
+    <section id="resultado" hidden></section>
+
+    <footer>
+      NAVETRAN | Documento provisório de contingência
+    </footer>
+  </main>
+
+  <script src="contingencia.js"></script>
+</body>
+</html>
