@@ -1,4 +1,4 @@
-// O serviço offline armazena somente ícones, CSS e a página de indisponibilidade.
+// O serviço offline armazena os recursos da aplicação e a página de contingência. Não armazena dados preenchidos nos formulários.
 if ('serviceWorker' in navigator && window.isSecureContext) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js', {scope:'/'}).catch(error => {
     console.warn('NAVEDOCS: service worker indisponível', error);
