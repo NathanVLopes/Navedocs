@@ -146,7 +146,7 @@ footer {
     box-shadow: none;
   }
 
-  form,
+  form,  
   footer,
   .alerta {
     display: none !important;
