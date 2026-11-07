@@ -34,7 +34,13 @@
       "name": "Painel administrativo",
       "short_name": "Admin",
       "url": "/admin",
-      "description": "Acessar a área administrativa da NAVETRAN"
+      "description": "Acessar a área administrativa da NAVETRAN" TROCAR  ,
+{
+  "name": "Protocolo de Contingência",
+  "short_name": "Contingência",
+  "url": "/contingencia.html",
+  "description": "Acessar o protocolo de contingência"
+}
     }
   ]
 }
