@@ -1,7 +1,7 @@
 {
   "name": "NAVEDOCS — Gestão de Documentos | NAVETRAN",
   "short_name": "NAVEDOCS",
-  "description": "Portal de envio de documentos da NAVETRAN. Ambiente de homologação.",
+  "description": "Portal de recebimento de documentos da NAVETRAN.",
   "lang": "pt-BR",
   "id": "/",
   "start_url": "/?source=pwa",

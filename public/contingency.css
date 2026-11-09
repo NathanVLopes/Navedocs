@@ -1,0 +1,5 @@
+/* Estilo restrito ao painel, sem alterar componentes globais */
+.contingency-section{border-top:1px solid #d7e1eb;margin-top:22px;padding-top:14px;display:grid;gap:12px}
+.contingency-section form{display:grid;gap:12px;margin-top:12px}
+.contingency-section textarea{min-height:90px;resize:vertical}
+.contingency-section .btn{max-width:100%;white-space:normal}
