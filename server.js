@@ -115,13 +115,38 @@ app.use(['/api/citizen/chat','/api/staff/chat'],(req,res,next)=>{
 const sha256=value=>createHash('sha256').update(value).digest('hex');
 const CHAT_LIMIT=50;
 const chatAttempts=new Map();
-function chatRate(req,res,next){
- const key=(req.user?'u:'+req.user.id:'ip:'+req.ip)+':'+req.path;
- const now=Date.now(),list=(chatAttempts.get(key)||[]).filter(t=>t>now-60000);
- if(chatAttempts.size>10000){for(const [k,times] of chatAttempts){if(times.every(t=>t<=now-60000))chatAttempts.delete(k);}}
- if(list.length>=12)return res.status(429).json({error:'Muitas mensagens ou tentativas. Aguarde um minuto.'});
- list.push(now);chatAttempts.set(key,list);next();
+
+function chatRate(req, res, next) {
+  const isRead = req.method === 'GET';
+  const limit = isRead ? 90 : 12;
+
+  const key =
+    (req.user ? 'u:' + req.user.id : 'ip:' + req.ip) +
+    ':' + req.method + ':' + req.path;
+
+  const now = Date.now();
+  const list = (chatAttempts.get(key) || [])
+    .filter(t => t > now - 60000);
+
+  if (chatAttempts.size > 10000) {
+    for (const [k, times] of chatAttempts) {
+      if (times.every(t => t <= now - 60000)) {
+        chatAttempts.delete(k);
+      }
+    }
+  }
+
+  if (list.length >= limit) {
+    return res.status(429).json({
+      error: 'Limite temporário atingido. Aguarde um minuto.'
+    });
+  }
+
+  list.push(now);
+  chatAttempts.set(key, list);
+  next();
 }
+
 function chatBody(req,res,next){
  if(typeof req.body?.body!=='string')return res.status(400).json({error:'Digite uma mensagem.'});
  const body=req.body.body.trim();
