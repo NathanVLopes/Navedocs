@@ -1,0 +1,17 @@
+NAVEDOCS — Correção de rotas (base v0.2.0)
+
+Problema: / e /index.html redirecionavam para /admin quando NAVEDOCS_INTERNAL_TESTS=1 e STAGING=1.
+
+Correção: remove somente esses dois redirecionamentos. /admin continua normal e /interno continua exigindo login, com checagem do modo interno.
+
+INSTALAÇÃO:
+1. Acesse github.com/NathanVLopes/Navedocs
+2. Na RAIZ do repositório, substitua somente server.js pelo deste pacote.
+3. Faça commit. NÃO coloque server.js dentro de public.
+4. Verifique o deploy no Railway e teste /, /admin e /interno.
+
+ATENÇÃO:
+* O modo interno ainda exige autenticação para enviar solicitações. Abrir / não significa que o envio público está liberado.
+* As variáveis do Railway e os dados do SQLite não são alterados por esse patch.
+* O arquivo foi criado a partir da v0.2.0 carregada neste ambiente e comparado com o conteúdo atual do GitHub (mesmo tamanho e trecho de rota).
+* Não aplique por cima de edições posteriores do server.js sem comparar diferenças primeiro.
