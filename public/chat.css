@@ -1,0 +1,11 @@
+/* NAVEDOCS — chats: identidade e componentes existentes preservados */
+.chat-panel,.chat-citizen-card{display:grid;gap:14px}.chat-panel{padding:20px;border:1px solid #dae4ed;border-radius:14px;background:#fff}
+.chat-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.chat-panel-heading h2,.chat-panel-heading h3{margin:0;color:#102d4b}
+.chat-hint{color:#60758b}.chat-status{margin:0;color:#526a80;min-height:1.2em}.chat-messages{display:flex;flex-direction:column;gap:10px;min-height:140px;max-height:400px;overflow-y:auto;padding:12px;border:1px solid #dae4ed;border-radius:10px;background:#f7f9fc;overscroll-behavior:contain}
+.chat-message{max-width:min(90%,620px);padding:10px 14px;border-radius:12px;border:1px solid #d9e5ef;overflow-wrap:anywhere;background:#fff;align-self:flex-start}.chat-message.chat-staff{background:#e8f0f8;border-color:#cddff1;align-self:flex-end}.chat-message-meta{font-size:12px;color:#49627c;margin-bottom:6px}.chat-message-body{margin:0;white-space:pre-wrap;line-height:1.55;color:#173354}
+.chat-compose{display:grid;gap:8px}.chat-compose textarea{width:100%;min-height:78px;resize:vertical}.chat-actions{display:flex;justify-content:flex-end}.chat-request-section{margin-top:22px}.chat-access{border-top:1px solid #dae4ed;padding-top:12px;margin-top:20px}.chat-access summary{cursor:pointer;font-weight:650;color:#173354}.chat-code-output{overflow-wrap:anywhere}.chat-unread{font-size:12px;padding:2px 7px;border-radius:20px;background:#f4b344;color:#0f2b48;margin-left:8px}
+.chat-citizen-main{max-width:960px;padding:28px 16px;margin:0 auto}.chat-citizen-card{padding:clamp(16px,3vw,32px)}.chat-citizen-card h1{margin:0;color:#102d4b}.chat-access-form{display:grid;gap:12px}.chat-access-form .btn{justify-self:start}
+@media(max-width:640px){.chat-messages{max-height:52vh}.chat-message{max-width:97%}.chat-panel{padding:12px}.chat-panel-heading{align-items:flex-start}}
+
+#chat-code{display:block;overflow-wrap:anywhere;word-break:break-all;font-size:clamp(12px,2vw,17px)}
+.chat-alert-list{display:grid;gap:6px;margin:0 0 12px;padding:14px;border:1px solid #dae4ed;border-radius:12px;background:#fff}.chat-alert-item{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
