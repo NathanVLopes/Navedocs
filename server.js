@@ -34,6 +34,32 @@ db.exec(`CREATE TABLE IF NOT EXISTS detran_contingencies (
  external_recorded_by INTEGER REFERENCES users(id),
  external_recorded_at TEXT
 );`);
+// Chat v0.2.0: tabelas aditivas, sem alterar dados ou estruturas anteriores.
+db.exec(`CREATE TABLE IF NOT EXISTS chat_access (
+ request_id INTEGER PRIMARY KEY REFERENCES requests(id) ON DELETE CASCADE,
+ token_hash TEXT NOT NULL UNIQUE,
+ issued_at TEXT NOT NULL,
+ issued_by INTEGER REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS chat_messages (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ channel TEXT NOT NULL CHECK(channel IN ('citizen','team')),
+ request_id INTEGER NOT NULL DEFAULT 0,
+ sender_type TEXT NOT NULL CHECK(sender_type IN ('citizen','staff')),
+ sender_id INTEGER REFERENCES users(id),
+ body TEXT NOT NULL CHECK(length(body) BETWEEN 1 AND 2000),
+ created_at TEXT NOT NULL,
+ CHECK ((channel='citizen' AND request_id>0) OR (channel='team' AND request_id>=0)),
+ CHECK ((sender_type='citizen' AND sender_id IS NULL) OR (sender_type='staff' AND sender_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS ix_chat_messages_channel ON chat_messages(channel,request_id,id);
+CREATE TABLE IF NOT EXISTS chat_reads (
+ user_id INTEGER NOT NULL REFERENCES users(id),
+ channel TEXT NOT NULL,
+ request_id INTEGER NOT NULL DEFAULT 0,
+ last_message_id INTEGER NOT NULL DEFAULT 0,
+ PRIMARY KEY(user_id,channel,request_id)
+);`);
 const normalizeCpf=v=>String(v||'').replace(/\D/g,'');
 function validCpf(v){ if(!/^\d{11}$/.test(v)||/^(\d)\1+$/.test(v)) return false; for(let size=9;size<=10;size++){ let sum=0;for(let i=0;i<size;i++) sum+=Number(v[i])*(size+1-i); let digit=(sum*10)%11;if(digit===10) digit=0;if(digit!==Number(v[size])) return false;}return true; }
 function hashPassword(pass,salt=randomBytes(16).toString('hex')){return salt+':'+scryptSync(pass,salt,64).toString('hex');}
@@ -78,6 +104,108 @@ const loginAttempts=new Map();
 app.post('/api/login',(req,res)=>{const key=req.ip;const now=Date.now();const v=loginAttempts.get(key)||{count:0,until:0};if(v.until>now)return res.status(429).json({error:'Muitas tentativas. Tente mais tarde.'});let u=db.prepare('SELECT * FROM users WHERE username=?').get(String(req.body.username||''));if(!u||!checkPassword(String(req.body.password||''),u.password_hash)){v.count++;v.until=v.count>=5?now+15*60*1000:0;loginAttempts.set(key,v);return res.status(401).json({error:'Usuário ou senha incorretos.'});}loginAttempts.delete(key);const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(createHash('sha256').update(token).digest('hex'),u.id,now+8*3600*1000);res.cookie(cookieName,token,{httpOnly:true,sameSite:'strict',secure:req.secure,maxAge:8*3600*1000,path:'/'});res.json({user:{username:u.username,role:u.role}});});
 app.post('/api/logout',auth,(req,res)=>{const token=(req.headers.cookie||'').match(/(?:^|; )navedocs_session=([a-f0-9]{64})/)?.[1];if(token)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(createHash('sha256').update(token).digest('hex'));res.clearCookie(cookieName,{path:'/'});res.json({ok:true});});
 app.get('/api/me',auth,(req,res)=>res.json({user:req.user}));
+
+// Ativação independente do upload público: chat desligado por padrão até revisão do piloto.
+const chatEnabled=process.env.NAVEDOCS_CHAT_ENABLED==='1';
+app.use(['/api/citizen/chat','/api/staff/chat'],(req,res,next)=>{
+ if(!chatEnabled)return res.status(503).json({error:'Chat indisponível até a ativação administrativa.'});
+ next();
+});
+// Chats isolados por canal e protocolo. Sem WebSocket obrigatório: polling leve.
+const sha256=value=>createHash('sha256').update(value).digest('hex');
+const CHAT_LIMIT=50;
+const chatAttempts=new Map();
+function chatRate(req,res,next){
+ const key=(req.user?'u:'+req.user.id:'ip:'+req.ip)+':'+req.path;
+ const now=Date.now(),list=(chatAttempts.get(key)||[]).filter(t=>t>now-60000);
+ if(chatAttempts.size>10000){for(const [k,times] of chatAttempts){if(times.every(t=>t<=now-60000))chatAttempts.delete(k);}}
+ if(list.length>=12)return res.status(429).json({error:'Muitas mensagens ou tentativas. Aguarde um minuto.'});
+ list.push(now);chatAttempts.set(key,list);next();
+}
+function chatBody(req,res,next){
+ if(typeof req.body?.body!=='string')return res.status(400).json({error:'Digite uma mensagem.'});
+ const body=req.body.body.trim();
+ if(body.length<1||body.length>2000||/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(body))return res.status(400).json({error:'Mensagem inválida (máximo 2.000 caracteres).'});
+ req.chatBody=body;next();
+}
+function chatMessages(channel,requestId,before){
+ const limit=CHAT_LIMIT;
+ const rows=db.prepare(`SELECT m.id,m.sender_type,m.sender_id,
+  CASE WHEN m.sender_type='staff' THEN u.username ELSE 'Cidadão' END sender,
+  m.body,m.created_at FROM chat_messages m LEFT JOIN users u ON m.sender_id=u.id
+  WHERE m.channel=? AND m.request_id=? AND m.id<? ORDER BY m.id DESC LIMIT ?`)
+  .all(channel,requestId,before,limit+1);
+ const hasMore=rows.length>limit;
+ if(hasMore)rows.pop();
+ return {items:rows.reverse(),hasMore,nextBefore:hasMore?rows[0]?.id:null};
+}
+function chatCursor(value){const n=Number(value);return Number.isSafeInteger(n)&&n>0?n:Number.MAX_SAFE_INTEGER;}
+function citizenChatAuth(req,res,next){
+ const protocol=String(req.params.protocol||'');
+ const code=req.get('X-NAVEDOCS-ACCESS')||'';
+ if(!/^NAV-[0-9]{4}-[A-F0-9]{10}$/.test(protocol)||!/^[a-f0-9]{64}$/.test(code))return res.status(404).json({error:'Protocolo ou código de acesso inválido.'});
+ const record=db.prepare(`SELECT r.id,r.protocol,r.status,ca.token_hash FROM requests r JOIN chat_access ca ON ca.request_id=r.id WHERE r.protocol=?`).get(protocol);
+ if(!record||!timingSafeEqual(Buffer.from(record.token_hash,'hex'),Buffer.from(sha256(code),'hex')))
+  return res.status(404).json({error:'Protocolo ou código de acesso inválido.'});
+ req.chatRequest=record;next();
+}
+function staffChatRequest(req,res,next){
+ const id=Number(req.params.id);
+ if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'Solicitação inválida.'});
+ const entry=db.prepare('SELECT id,protocol,status FROM requests WHERE id=?').get(id);
+ if(!entry)return res.status(404).json({error:'Solicitação não encontrada.'});
+ req.chatRequest=entry;next();
+}
+function insertChat(channel,requestId,senderType,senderId,body){
+ const now=new Date().toISOString();
+ const result=db.prepare('INSERT INTO chat_messages(channel,request_id,sender_type,sender_id,body,created_at) VALUES (?,?,?,?,?,?)').run(channel,requestId,senderType,senderId,body,now);
+ return {id:Number(result.lastInsertRowid),sender_type:senderType,body,created_at:now};
+}
+function staffUnread(userId,channel,requestId){
+ const row=db.prepare(`SELECT COUNT(*) total FROM chat_messages m WHERE m.channel=? AND m.request_id=? AND m.sender_type='citizen' AND m.id>
+  COALESCE((SELECT last_message_id FROM chat_reads WHERE user_id=? AND channel=? AND request_id=?),0)`).get(channel,requestId,userId,channel,requestId);
+ return row.total;
+}
+function markStaffRead(userId,channel,requestId){
+ const last=db.prepare('SELECT COALESCE(MAX(id),0) AS id FROM chat_messages WHERE channel=? AND request_id=?').get(channel,requestId).id;
+ db.prepare(`INSERT INTO chat_reads(user_id,channel,request_id,last_message_id) VALUES (?,?,?,?)
+  ON CONFLICT(user_id,channel,request_id) DO UPDATE SET last_message_id=MAX(chat_reads.last_message_id,excluded.last_message_id)`).run(userId,channel,requestId,last);
+}
+// Cidadão: token secreto distinto do protocolo. Nunca aceitar CPF como autenticação.
+app.get('/api/citizen/chat/:protocol',chatRate,citizenChatAuth,(req,res)=>res.json({protocol:req.chatRequest.protocol,status:req.chatRequest.status,...chatMessages('citizen',req.chatRequest.id,chatCursor(req.query.before))}));
+app.post('/api/citizen/chat/:protocol',chatRate,citizenChatAuth,chatBody,(req,res)=>{
+ const msg=insertChat('citizen',req.chatRequest.id,'citizen',null,req.chatBody);
+ res.status(201).json({message:msg});
+});
+// Os arquivos existentes continuam na área de documentos: chat não aceita upload arbitrário.
+app.get('/api/staff/chat/request/:id',auth,staffChatRequest,(req,res)=>{
+ const result=chatMessages('citizen',req.chatRequest.id,chatCursor(req.query.before));
+ if(!req.query.before)markStaffRead(req.user.id,'citizen',req.chatRequest.id);
+ res.json({...result,protocol:req.chatRequest.protocol});
+});
+app.post('/api/staff/chat/request/:id',auth,chatRate,staffChatRequest,chatBody,(req,res)=>{
+ res.status(201).json({message:insertChat('citizen',req.chatRequest.id,'staff',req.user.id,req.chatBody)});
+});
+// Conversa exclusivamente interna: nunca servida por API de cidadão.
+app.get('/api/staff/chat/team',auth,(req,res)=>res.json(chatMessages('team',0,chatCursor(req.query.before))));
+app.post('/api/staff/chat/team',auth,chatRate,chatBody,(req,res)=>res.status(201).json({message:insertChat('team',0,'staff',req.user.id,req.chatBody)}));
+// Acesso a conversas antigas: admin pode emitir/rotacionar um código; só exibe no momento da emissão.
+app.post('/api/staff/chat/request/:id/access',auth,adminOnly,chatRate,staffChatRequest,(req,res)=>{
+ const token=randomBytes(32).toString('hex'),now=new Date().toISOString();
+ db.prepare(`INSERT INTO chat_access(request_id,token_hash,issued_at,issued_by) VALUES (?,?,?,?)
+   ON CONFLICT(request_id) DO UPDATE SET token_hash=excluded.token_hash,issued_at=excluded.issued_at,issued_by=excluded.issued_by`)
+   .run(req.chatRequest.id,sha256(token),now,req.user.id);
+ db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES (?,?,?,?)').run(req.user.id,req.chatRequest.id,'chat-access-rotated',now);
+ res.status(201).json({protocol:req.chatRequest.protocol,chatCode:token});
+});
+app.get('/api/staff/chat/unread',auth,(req,res)=>{
+ const rows=db.prepare(`SELECT r.id,r.protocol,
+  (SELECT COUNT(*) FROM chat_messages m WHERE m.channel='citizen' AND m.request_id=r.id AND m.sender_type='citizen' AND m.id>
+  COALESCE((SELECT last_message_id FROM chat_reads WHERE user_id=? AND channel='citizen' AND request_id=r.id),0)) AS unread
+  FROM requests r WHERE EXISTS(SELECT 1 FROM chat_messages c WHERE c.channel='citizen' AND c.request_id=r.id AND c.sender_type='citizen')
+  ORDER BY r.updated_at DESC LIMIT 500`).all(req.user.id);
+ res.json({items:rows.filter(row=>row.unread>0)});
+});
 
 // Gestão de usuários: ações administrativas controladas no servidor.
 app.get('/api/users',auth,adminOnly,(req,res)=>{
@@ -132,11 +260,12 @@ app.post('/api/requests', (req,res,next)=>{
  // CPF com dígitos verificadores válidos é obrigatório, inclusive em testes.
  if(name.length<3||name.length>120||!validCpf(cpf)||!SERVICES.includes(service)||!files.length)return res.status(400).json({error:'Confira nome, CPF, tipo de solicitação e anexos.'});
  if(files.some(f=>!detect(f.buffer)))return res.status(400).json({error:'Arquivos aceitos: PDF, JPG e PNG válidos.'});
- const inserted=[];let id;const now=new Date().toISOString();const protocol='NAV-'+new Date().getUTCFullYear()+'-'+randomBytes(5).toString('hex').toUpperCase();
+ const inserted=[];let id;const now=new Date().toISOString();const protocol='NAV-'+new Date().getUTCFullYear()+'-'+randomBytes(5).toString('hex').toUpperCase();const chatCode=randomBytes(32).toString('hex');
  try{db.exec('BEGIN IMMEDIATE');let a=db.prepare('INSERT INTO requests(protocol,citizen_name,cpf,service,created_at,updated_at) VALUES (?,?,?,?,?,?)').run(protocol,name,cpf,service,now,now);id=Number(a.lastInsertRowid);
+ db.prepare('INSERT INTO chat_access(request_id,token_hash,issued_at) VALUES (?,?,?)').run(id,sha256(chatCode),now);
  for(const f of files){const sig=detect(f.buffer);const filename=randomBytes(20).toString('hex')+sig.ext;requireWrite(filename,f.buffer);inserted.push(filename);db.prepare('INSERT INTO files(request_id,original_name,disk_name,mime,size) VALUES (?,?,?,?,?)').run(id,path.basename(f.originalname).slice(0,180),filename,sig.mime,f.size);}
  if(internalPilot && req.user)db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES (?,?,?,?)').run(req.user.id,id,'internal-test-request-created',now);
- db.exec('COMMIT');return res.status(201).json({protocol});}catch(e){try{db.exec('ROLLBACK');}catch{}cleanup(inserted);console.error('Erro no envio',e);return res.status(500).json({error:'Não foi possível receber os documentos. Tente novamente.'});}
+ db.exec('COMMIT');return res.status(201).json({protocol,chatCode});}catch(e){try{db.exec('ROLLBACK');}catch{}cleanup(inserted);console.error('Erro no envio',e);return res.status(500).json({error:'Não foi possível receber os documentos. Tente novamente.'});}
 });
 function requireWrite(name,buf){const {writeFileSync}=fsOps;writeFileSync(path.join(storageDir,name),buf,{flag:'wx',mode:0o600});}
 import * as fsOps from 'node:fs';
@@ -237,6 +366,7 @@ if(internalPilot){
  app.get('/',(req,res)=>res.redirect(302,'/admin'));
  app.get('/index.html',(req,res)=>res.redirect(302,'/admin'));
 }
+app.get('/acompanhar',(req,res)=>{if(!chatEnabled)return res.status(503).send('Chat ainda não habilitado.');res.setHeader('Cache-Control','private, no-store');res.sendFile(path.join(root,'public/acompanhar.html'));});
 app.use(express.static(path.join(root,'public'),{index:'index.html',maxAge:0}));app.get('/admin',(req,res)=>res.sendFile(path.join(root,'public/admin.html')));
 app.use((err,req,res,next)=>{if(err instanceof multer.MulterError)return res.status(400).json({error:'Limite de arquivos excedido (máximo 8 arquivos de até 10 MB cada).'});console.error(err);res.status(500).json({error:'Erro interno.'});});
 app.listen(port,()=>console.log(`NAVEDOCS disponível em http://localhost:${port}`));
