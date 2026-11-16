@@ -1,8 +1,8 @@
-import {mountChat,showUnread} from '/chat-ui.js';
+import {mountChat,showUnread,userAvatar} from '/chat-ui.js';
 const $=s=>document.querySelector(s),state={start:'',end:'',tab:'dashboard',items:[],role:'atendente'};
 async function api(url,opt={}){let r=await fetch(url,{credentials:'same-origin',...opt});let d=await r.json().catch(()=>({}));if(r.status===401 && url!=='/api/login'){setLoggedOut();throw Error('Sessão expirada. Faça login novamente.');}if(!r.ok)throw Error(d.error||'Não foi possível completar a operação.');return d;}
 function setLoggedOut(){setPresentation(false);$('#login-view').classList.remove('hidden');$('#app-view').classList.add('hidden');}
-function loggedIn(user){state.role=['admin','superadmin'].includes(user.role)?user.role:'atendente';document.querySelectorAll('[data-admin-only]').forEach(el=>el.classList.toggle('hidden',!['admin','superadmin'].includes(state.role)));$('#userbox').textContent=user.username+' · '+(state.role==='superadmin'?'Superadministrador':['admin','superadmin'].includes(state.role)?'Administrador':'Atendente')+' · NAVETRAN';$('#login-view').classList.add('hidden');$('#app-view').classList.remove('hidden');showTab(!['admin','superadmin'].includes(state.role)&&state.tab==='users'?'dashboard':state.tab);showUnread().catch(()=>{});}
+function loggedIn(user){state.user=user;state.role=['admin','superadmin'].includes(user.role)?user.role:'atendente';document.querySelectorAll('[data-admin-only]').forEach(el=>el.classList.toggle('hidden',!['admin','superadmin'].includes(state.role)));$('#userbox').textContent=user.username+' · '+(state.role==='superadmin'?'Superadministrador':['admin','superadmin'].includes(state.role)?'Administrador':'Atendente')+' · NAVETRAN';renderOwnAvatar();$('#login-view').classList.add('hidden');$('#app-view').classList.remove('hidden');showTab(!['admin','superadmin'].includes(state.role)&&state.tab==='users'?'dashboard':state.tab);showUnread().catch(()=>{});}
 $('#login-form').addEventListener('submit',async e=>{e.preventDefault();const form=e.target;const button=form.querySelector('button');button.disabled=true;$('#login-error').textContent='';try{const d=await api('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(form)))});form.reset();loggedIn(d.user);}catch(err){$('#login-error').className='notice error';$('#login-error').textContent=err.message;}finally{button.disabled=false;}});
 $('#logout').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST'});setLoggedOut();}catch(err){alertError(err.message);}});
 function alertError(msg){const el=state.tab==='requests'?$('#requests-error'):$('#dashboard-error');el.className='notice error';el.textContent=msg;}
@@ -133,7 +133,7 @@ setInterval(()=>{if(!$('#app-view').classList.contains('hidden'))showUnread().ca
 period('month');setInterval(()=>{if(!$('#app-view').classList.contains('hidden')){if(state.tab==='dashboard')loadDashboard();if(state.tab==='requests')loadRequests();}},30000);api('/api/me').then(d=>loggedIn(d.user)).catch(()=>setLoggedOut());
 
 // Gerenciamento de contas acessível somente ao administrador, com validação também no servidor.
-async function loadUsers(){try{const d=await api('/api/users');const list=$('#users-list');list.replaceChildren();for(const u of d.items){const row=document.createElement('div');row.className='file-row';const label=document.createElement('span');label.textContent=u.username+' — '+(u.role==='superadmin'?'Superadministrador':u.role==='admin'?'Administrador':'Atendente');row.append(label);list.append(row);}}catch(err){$('#users-feedback').textContent=err.message;}}
+async function loadUsers(){try{const d=await api('/api/users');const list=$('#users-list');list.replaceChildren();for(const u of d.items){const row=document.createElement('div');row.className='file-row';const label=document.createElement('span');label.textContent=u.username+' — '+(u.role==='superadmin'?'Superadministrador':u.role==='admin'?'Administrador':'Atendente');row.append(userAvatar(u.id,u.username),label);list.append(row);}}catch(err){$('#users-feedback').textContent=err.message;}}
 $('#new-user-form').addEventListener('submit',async event=>{event.preventDefault();if(!['admin','superadmin'].includes(state.role))return;const form=event.currentTarget,button=form.querySelector('button[type=submit]');button.disabled=true;$('#users-feedback').textContent='';try{const data=Object.fromEntries(new FormData(form));await api('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});form.reset();$('#users-feedback').textContent='Usuário cadastrado.';await loadUsers();}catch(err){$('#users-feedback').textContent=err.message;}finally{button.disabled=false;}});
 $('#password-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type=submit]');button.disabled=true;$('#password-feedback').textContent='';try{const data=Object.fromEntries(new FormData(form));await api('/api/me/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});form.reset();setLoggedOut();$('#login-error').textContent='Senha atualizada. Entre novamente.';}catch(err){$('#password-feedback').textContent=err.message;}finally{button.disabled=false;}});
 
@@ -142,3 +142,31 @@ function setPresentation(on){const presentationButton=$('#presentation-toggle');
 $('#presentation-toggle').addEventListener('click',()=>{showTab('dashboard');setPresentation(!document.body.classList.contains('report-presentation'));});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('report-presentation'))setPresentation(false);});
 $('#print-report').addEventListener('click',async()=>{if(await loadDashboard())window.print();});
+
+function renderOwnAvatar(revision=''){
+ const {id,username}=state.user;
+ $('#userbox .user-avatar')?.remove();
+ $('#userbox').prepend(userAvatar(id,username,revision));
+ $('#profile-avatar').replaceChildren(userAvatar(id,username,revision));
+}
+const avatarForm=$('#avatar-form');
+async function changeAvatar(method,body){
+ const buttons=avatarForm.querySelectorAll('button');
+ buttons.forEach(button=>button.disabled=true);
+ const feedback=$('#avatar-feedback');
+ feedback.textContent='Salvando…';
+ try{
+  await api('/api/me/avatar',{method,body});
+  avatarForm.reset();
+  renderOwnAvatar(Date.now());
+  feedback.textContent=method==='DELETE'?'Foto removida.':'Foto atualizada.';
+ }catch(error){feedback.textContent=error.message;}
+ finally{buttons.forEach(button=>button.disabled=false);}
+}
+avatarForm.addEventListener('submit',event=>{
+ event.preventDefault();
+ const file=avatarForm.elements.avatar.files[0];
+ if(file.size>2*1024*1024){$('#avatar-feedback').textContent='A foto deve ter até 2 MB.';return;}
+ changeAvatar('POST',new FormData(avatarForm));
+});
+$('#avatar-remove').addEventListener('click',()=>changeAvatar('DELETE'));

@@ -8,9 +8,21 @@ async function request(url,options={}){
 }
 function node(tag,className,text){const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;}
 function timeText(value){try{return new Date(value).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});}catch{return value;}}
+export function userAvatar(id,name,revision=''){
+ const avatar=node('span','user-avatar',(name||'?').trim().slice(0,2).toLocaleUpperCase('pt-BR'));
+ avatar.setAttribute('aria-hidden','true');
+ if(id){
+  const image=document.createElement('img');
+  image.alt='';
+  image.addEventListener('load',()=>avatar.replaceChildren(image),{once:true});
+  image.src='/api/users/'+encodeURIComponent(id)+'/avatar'+(revision?'?v='+revision:'');
+ }
+ return avatar;
+}
 function messageElement(message){
  const row=node('article','chat-message '+(message.sender_type==='staff'?'chat-staff':'chat-citizen'));
  const meta=node('div','chat-message-meta',(message.sender|| (message.sender_type==='staff'?'Servidor NAVETRAN':'Cidadão'))+' · '+timeText(message.created_at));
+ if(message.sender_type==='staff')meta.prepend(userAvatar(message.sender_id,message.sender));
  const body=node('p','chat-message-body',message.body);
  row.append(meta,body);return row;
 }

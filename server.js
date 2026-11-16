@@ -115,8 +115,38 @@ function originGuard(req,res,next){if(!['POST','PATCH','PUT','DELETE'].includes(
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
 app.use('/api',originGuard);
 const loginAttempts=new Map();
-app.post('/api/login',(req,res)=>{const key=req.ip;const now=Date.now();const v=loginAttempts.get(key)||{count:0,until:0};if(v.until>now)return res.status(429).json({error:'Muitas tentativas. Tente mais tarde.'});let u=db.prepare('SELECT * FROM users WHERE username=?').get(String(req.body.username||''));if(!u||!checkPassword(String(req.body.password||''),u.password_hash)){v.count++;v.until=v.count>=5?now+15*60*1000:0;loginAttempts.set(key,v);return res.status(401).json({error:'Usuário ou senha incorretos.'});}loginAttempts.delete(key);const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(createHash('sha256').update(token).digest('hex'),u.id,now+8*3600*1000);res.cookie(cookieName,token,{httpOnly:true,sameSite:'strict',secure:req.secure,maxAge:8*3600*1000,path:'/'});res.json({user:{username:u.username,role:u.role}});});
+app.post('/api/login',(req,res)=>{const key=req.ip;const now=Date.now();const v=loginAttempts.get(key)||{count:0,until:0};if(v.until>now)return res.status(429).json({error:'Muitas tentativas. Tente mais tarde.'});let u=db.prepare('SELECT * FROM users WHERE username=?').get(String(req.body.username||''));if(!u||!checkPassword(String(req.body.password||''),u.password_hash)){v.count++;v.until=v.count>=5?now+15*60*1000:0;loginAttempts.set(key,v);return res.status(401).json({error:'Usuário ou senha incorretos.'});}loginAttempts.delete(key);const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(createHash('sha256').update(token).digest('hex'),u.id,now+8*3600*1000);res.cookie(cookieName,token,{httpOnly:true,sameSite:'strict',secure:req.secure,maxAge:8*3600*1000,path:'/'});res.json({user:{id:u.id,username:u.username,role:u.role}});});
 app.post('/api/logout',auth,(req,res)=>{const token=(req.headers.cookie||'').match(/(?:^|; )navedocs_session=([a-f0-9]{64})/)?.[1];if(token)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(createHash('sha256').update(token).digest('hex'));res.clearCookie(cookieName,{path:'/'});res.json({ok:true});});
+db.exec(`CREATE TABLE IF NOT EXISTS user_avatars (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ mime TEXT NOT NULL CHECK(mime IN ('image/png','image/jpeg')),
+ content BLOB NOT NULL CHECK(length(content) BETWEEN 16 AND 2097152)
+)`);
+const avatarUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:2*1024*1024,files:1,fields:0}}).single('avatar');
+app.get('/api/users/:id/avatar',auth,(req,res)=>{
+ res.set('Cache-Control','private, no-store');
+ const id=Number(req.params.id);
+ const avatar=Number.isSafeInteger(id)&&id>0?db.prepare('SELECT mime,content FROM user_avatars WHERE user_id=?').get(id):null;
+ if(!avatar)return res.status(404).end();
+ res.type(avatar.mime).send(Buffer.from(avatar.content));
+});
+app.post('/api/me/avatar',auth,(req,res,next)=>{
+ avatarUpload(req,res,error=>{
+  if(error instanceof multer.MulterError)return res.status(400).json({error:'Envie uma imagem de até 2 MB.'});
+  next(error);
+ });
+},(req,res)=>{
+  const content=req.file?.buffer;
+  const image=content&&detect(content);
+  if(!['image/png','image/jpeg'].includes(image?.mime))return res.status(400).json({error:'Selecione uma imagem JPG ou PNG.'});
+  db.prepare(`INSERT INTO user_avatars(user_id,mime,content) VALUES(?,?,?)
+   ON CONFLICT(user_id) DO UPDATE SET mime=excluded.mime,content=excluded.content`).run(req.user.id,image.mime,content);
+  res.json({ok:true});
+});
+app.delete('/api/me/avatar',auth,(req,res)=>{
+ db.prepare('DELETE FROM user_avatars WHERE user_id=?').run(req.user.id);
+ res.json({ok:true});
+});
 app.get('/api/me',auth,(req,res)=>res.json({user:req.user}));
 
 // Ativação independente do upload público: chat desligado por padrão até revisão do piloto.
