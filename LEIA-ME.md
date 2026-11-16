@@ -1,42 +1,41 @@
-# NAVEDOCS — endurecimento de segurança pré-produção (0.2.1)
+# NAVEDOCS — atualização técnica proposta (16/11/2026)
 
-## Escopo
+**Status:** patch preparado e testado estaticamente em cópia local baseada no pacote NAVEDOCS v0.2.0. **Não aplicado ao GitHub/Railway, não testado contra o banco de produção/homologação.**
 
-Este pacote contém um patch conservador para a versão atualmente instalada no repositório. **Não muda o banco, os documentos, as interfaces, nem publica o sistema.** Corrige duas regras de servidor:
+## Como aplicar com segurança
 
-1. Com `STAGING=1`, o recebimento só é permitido se `ENABLE_TEST_UPLOADS=1`, `NAVEDOCS_INTERNAL_TESTS=1` **e** a sessão pertencer a um administrador ou atendente. Não existe recebimento público por uma combinação acidental de variáveis.
-2. Ao sair de homologação, a senha adicional fraca de um administrador **já cadastrado** não impede a inicialização. Para cadastrar um novo administrador adicional via ambiente, a senha deve ser forte (mín. 16 caracteres, maiúscula, minúscula, dígito e símbolo). A senha antiga deve ser trocada pelo titular; esta correção **não a fortalece automaticamente**.
+1. Faça backup recuperável do banco SQLite e da pasta de documentos do volume Railway. Preserve o serviço/volume `navedocs-homologacao-dados`, o ambiente e os segredos.
+2. Baixe/clon​e a versão mais recente do repositório `NathanVLopes/Navedocs` em uma pasta de trabalho, nunca uma pasta de dados do Railway.
+3. Execute `python aplicar_atualizacao.py /caminho/para/Navedocs`. O script valida pontos de alteração e recusa versões incompatíveis. Ele cria `.backup-navedocs-AAAAMMDDHHMMSS/` dos arquivos existentes.
+4. Execute `node --check server.js` e `node --check public/admin.js`, instale dependências a partir de `package-lock.json` se presente (`npm ci`), execute `npm test` e teste os fluxos em uma cópia isolada do banco de dados. **Não rode o processo modificado apontando para `/data` antes de testar a migração em cópia.**
+5. Revise diferenças (`git diff`), execute os testes de permissão, acessibilidade e regressão; só então envie mudanças ao GitHub e publique em homologação com autorização.
+6. Após validação, para provisionar uma conta **nova** superadministradora, configure no Railway (como secrets) `NAVEDOCS_SUPERADMIN_USER` e `NAVEDOCS_SUPERADMIN_PASSWORD`. A senha deve ter entre 20 e 128 caracteres, com maiúscula, minúscula, número e símbolo; **não coloque a senha no GitHub**. A alteração das variáveis reinicia o serviço e deve ser feita apenas depois de verificar o deploy. Não afeta senhas já cadastradas.
 
-## Aplicação sem sobrescrever arquivos existentes
+## Funcionalidades incluídas
 
-1. Faça clone/backup do repositório e execute o patch em um branch, jamais diretamente em produção.
-2. Copie `apply-hardening.mjs` e `production-policy.mjs` para a raiz do repositório.
-3. Execute `node apply-hardening.mjs` na raiz. O script valida trechos do servidor existente, cria uma cópia local `server.js.pre-hardening-*.bak` e aborta se a estrutura não corresponder.
-4. Execute `node --check server.js` e `node --test tests/production-policy.test.mjs`. Revise `git diff` antes de fazer o commit.
-5. **Não suba o backup `.bak` para o GitHub.** Comite apenas `server.js`, `production-policy.mjs` e os testes; os scripts de aplicação podem ficar locais.
+- **Logo:** substituição somente de `public/navetran.svg` pelo arquivo transparente fornecido pelo usuário (verificado: cantos com alfa 0); preservação das cores e desenho.
+- **Minha conta:** a troca de senha passa a aparecer somente na aba `Minha conta`; disponível tanto para atendente quanto para administrador.
+- **Protocolo manual:** no detalhe de uma solicitação de **Recurso de multa**, um atendente visualiza e um administrador registra número provisório do papel, data/hora, serviço do formulário (defesa, indicação ou outro), telefone/e-mail, placa/AIT, checklist de documentos, observações, confirmação de assinaturas, servidor e data do registro. Número e vínculo são únicos e auditados. O template original em DOCX de **duas vias** é oferecido para download. O registro manual permanece separado do protocolo eletrônico interno `NVD-CONT` e do número oficial do DETRAN. Para um caso exclusivamente físico, primeiro registre o recebimento pela entrada interna autorizada, depois vincule o papel a essa solicitação.
+- **Superadministrador:** perfil separado dos administradores existentes, só provisionado por configuração segura. Pode corrigir nome/CPF e **arquivar/restaurar**, jamais eliminar fisicamente, mediante justificativa e confirmação de senha atual. Todas as ações são registradas em tabelas de auditoria. Contas `admin` e `atendente` continuam sem acesso a estas rotas.
+- **Relatórios:** botões `Apresentar`/`Sair da apresentação` e `Imprimir relatório` no dashboard existente; preserva gráficos e filtros originais. Impressão usa uma folha A4 com regras CSS específicas, sem imprimir os botões/menu.
 
-## Verificações realizadas aqui
+## Limites importantes
 
-- `node --check server.js` na cópia da versão 0.1.8: aprovado.
-- `node --test tests/production-policy.test.mjs`: 5 testes aprovados.
-- Não foi possível executar a aplicação Express real, browser ou testes HTTP neste ambiente, pois não estão disponíveis as dependências Node do projeto e acesso à infraestrutura interna.
-- Não foi possível verificar a integridade/restauração de backup do volume Railway nem os requisitos institucionais de privacidade.
+- **Não foi desenvolvido** um fluxo para cadastrar o papel sem uma solicitação digital prévia, nem um upload específico de digitalização da via assinada. Esses itens exigem requisitos de guarda/assinatura institucional.
+- O arquivamento conserva os dados e **não os exclui dos números históricos** do dashboard. A listagem administrativa sinaliza visualmente casos arquivados. Mudança da regra de indicadores exigirá homologação com a NAVETRAN.
+- Não existe conexão oficial com o DETRAN; nenhum protocolo aqui é certificado como protocolo emitido pelo DETRAN.
+- O patch faz uma migração **aditiva** no SQLite (`requests.archived_at`, `paper_appeal_receipts`, `privileged_request_actions`). Deve ser testado com backup e plano de recuperação antes do deploy.
+- O código ainda não teve teste end-to-end real com login, envio e persistência: somente validação sintática e de pontos de inserção em cópia local.
 
-## Gates de publicação (não ativar antes das validações)
+## Checklist para validação obrigatória
 
-Para simular internamente, usar `STAGING=1`, `NAVEDOCS_INTERNAL_TESTS=1`, `ENABLE_TEST_UPLOADS=1`, `NAVEDOCS_REAL_DATA_APPROVED=0`, com documentos **sintéticos** e conta autenticada.
+- Servidor inicia com base de teste; volume correto permanece conectado; mensagens e documentos anteriores estão preservados.
+- Usuário atendente consegue acessar `Minha conta`, **não** gerencia usuários ou ações privilegiadas; administrador mantém funções existentes; superadmin só executa ações depois de informar sua senha e justificativa.
+- Formulário manual recusa número duplicado, serviço diferente de Recurso de multa e payloads inválidos; aparece após recarga; não confunde com o protocolo DETRAN.
+- Arquivamento e restauração são auditados, os documentos permanecem acessíveis às pessoas autorizadas e não ocorre exclusão definitiva.
+- Modo apresentação e impressão mostram dados agregados corretos para o período escolhido em desktop/mobile/A4; fechar com Esc restaura a tela.
+- A logo transparente aparece no portal, acompanhamento e admin após cache limpo.
 
-Somente após verificação de backup+restauração, testes HTTP/UI, revisão de acessos/criptografia, privacidade e autorização institucional, transitar de modo controlado para:
+## Reversão
 
-- `STAGING=0`
-- `ENABLE_TEST_UPLOADS=0`
-- `NAVEDOCS_INTERNAL_TESTS=0`
-- `NAVEDOCS_REAL_DATA_APPROVED=1`
-
-ATENÇÃO: o `STAGING=0` sozinho **não autoriza** o envio, que permanece fechado se `NAVEDOCS_REAL_DATA_APPROVED` não estiver em `1`.
-
-Retirar “homologacao” do domínio é outra mudança, com atualização dos QR codes. **Não renomeie a URL sem plano de migração**.
-
-## Rollback
-
-Voltar o commit do patch, preservar `/data`, desabilitar uploads com `NAVEDOCS_REAL_DATA_APPROVED=0` e confirmar que o banco e os arquivos continuam acessíveis. O backup local da aplicação não é backup do SQLite ou dos documentos.
+Restaure os arquivos da pasta `.backup-navedocs-...` antes de novo deploy. Como a migração é aditiva, **não apague as tabelas/coluna** após gravação de dados sem procedimento aprovado de preservação de registros e um backup completo. Para problemas em homologação, reverta o código e preserve o volume intacto.
