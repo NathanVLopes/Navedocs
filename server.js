@@ -94,8 +94,22 @@ app.use(express.json({limit:'50kb'}));
 const cookieName='navedocs_session';
 function currentUser(req){let m=(req.headers.cookie||'').match(/(?:^|; )navedocs_session=([a-f0-9]{64})/);if(!m) return null;let hash=createHash('sha256').update(m[1]).digest('hex');return db.prepare('SELECT u.id,u.username,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').get(hash,Date.now())||null;}
 function auth(req,res,next){req.user=currentUser(req);if(!req.user)return res.status(401).json({error:'Acesse sua conta para continuar.'});next();}
-function adminOnly(req,res,next){if(req.user?.role!=='admin')return res.status(403).json({error:'Somente administradores podem realizar esta operação.'});next();}
-function strongPassword(password,role){return typeof password==='string'&&password.length>=(role==='admin'?16:12)&&password.length<=128&&/[A-Z]/.test(password)&&/[a-z]/.test(password)&&/[0-9]/.test(password)&&/[^A-Za-z0-9]/.test(password);}
+function adminOnly(req,res,next){if(!['admin','superadmin'].includes(req.user?.role))return res.status(403).json({error:'Somente administradores podem realizar esta operação.'});next();}
+function strongPassword(password,role){return typeof password==='string'&&password.length>=(role==='superadmin'?20:role==='admin'?16:12)&&password.length<=128&&/[A-Z]/.test(password)&&/[a-z]/.test(password)&&/[0-9]/.test(password)&&/[^A-Za-z0-9]/.test(password);}
+
+
+// NAVEDOCS-2026-11-16: superadministrador provisionado APENAS por variável segura.
+// Não modifica contas antigas nem imprime senha nos logs.
+const superName=String(process.env.NAVEDOCS_SUPERADMIN_USER||'').trim();
+const superPass=process.env.NAVEDOCS_SUPERADMIN_PASSWORD||'';
+if(superName||superPass){
+ if(!/^[A-Za-z0-9_.-]{3,40}$/.test(superName)||!strongPassword(superPass,'superadmin')){
+  console.error('Conta superadmin inválida: exige usuário e senha forte de 20+ caracteres.');process.exit(1);
+ }
+ const oldSuper=db.prepare('SELECT id,role FROM users WHERE username=?').get(superName);
+ if(!oldSuper)db.prepare('INSERT INTO users(username,password_hash,role) VALUES (?,?,?)').run(superName,hashPassword(superPass),'superadmin');
+ else if(oldSuper.role!=='superadmin'){console.error('Usuário reservado para superadmin já existe com outro papel.');process.exit(1);}
+}
 
 function originGuard(req,res,next){if(!['POST','PATCH','PUT','DELETE'].includes(req.method))return next();let o=req.headers.origin;if(o){try{if(new URL(o).host!==req.get('host'))return res.status(403).json({error:'Origem não permitida.'});}catch{return res.status(403).json({error:'Origem inválida.'});}}next();}
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
@@ -254,7 +268,7 @@ app.post('/api/me/password',auth,(req,res)=>{
  const current=String(req.body?.currentPassword||'');const next=req.body?.newPassword;
  const user=db.prepare('SELECT id,password_hash,role FROM users WHERE id=?').get(req.user.id);
  if(!user||!checkPassword(current,user.password_hash))return res.status(403).json({error:'Senha atual incorreta.'});
- if(!strongPassword(next,user.role))return res.status(400).json({error:'A nova senha precisa de maiúscula, minúscula, número e símbolo; mínimo 16 caracteres para admin ou 12 para atendente.'});
+ if(!strongPassword(next,user.role))return res.status(400).json({error:'A nova senha precisa de maiúscula, minúscula, número e símbolo; mínimo 20 caracteres para superadministrador, 16 para administrador ou 12 para atendente.'});
  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(next),user.id);
  db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);
  db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES (?,?,?,?)').run(user.id,null,'password-updated',new Date().toISOString());
@@ -274,7 +288,7 @@ app.post('/api/requests', (req,res,next)=>{
  if(internalPilot){
    // Só sessões válidas e usuários internos podem enviar; nenhuma sessão de visitante.
    req.user=currentUser(req);
-   if(!req.user || !['admin','atendente'].includes(req.user.role))
+   if(!req.user || !['admin','atendente','superadmin'].includes(req.user.role))
      return res.status(401).json({error:'Entre pelo painel administrativo para realizar testes internos.'});
    return next();
  }
@@ -294,7 +308,7 @@ app.post('/api/requests', (req,res,next)=>{
 });
 function requireWrite(name,buf){const {writeFileSync}=fsOps;writeFileSync(path.join(storageDir,name),buf,{flag:'wx',mode:0o600});}
 import * as fsOps from 'node:fs';
-app.get('/api/requests',auth,(req,res)=>{const search=String(req.query.q||'').trim().slice(0,120),status=String(req.query.status||''),start=String(req.query.start||''),end=String(req.query.end||'');let conditions=[],args=[];if(search){conditions.push('(citizen_name LIKE ? OR cpf LIKE ? OR protocol LIKE ?)');args.push(...Array(3).fill('%'+search+'%'));}if(['pendente','em_analise','concluido'].includes(status)){conditions.push('status=?');args.push(status);}if(/^\d{4}-\d{2}-\d{2}$/.test(start)){conditions.push('created_at>=?');args.push(start+'T00:00:00');}if(/^\d{4}-\d{2}-\d{2}$/.test(end)){conditions.push('created_at<?');args.push(end+'T23:59:59.999Z');}const where=conditions.length?'WHERE '+conditions.join(' AND '):'';const items=db.prepare(`SELECT id,protocol,citizen_name,cpf,service,status,created_at,(SELECT COUNT(*) FROM files WHERE request_id=requests.id) as file_count FROM requests ${where} ORDER BY created_at DESC LIMIT 500`).all(...args);res.json({items});});
+app.get('/api/requests',auth,(req,res)=>{const search=String(req.query.q||'').trim().slice(0,120),status=String(req.query.status||''),start=String(req.query.start||''),end=String(req.query.end||'');let conditions=[],args=[];if(search){conditions.push('(citizen_name LIKE ? OR cpf LIKE ? OR protocol LIKE ?)');args.push(...Array(3).fill('%'+search+'%'));}if(['pendente','em_analise','concluido'].includes(status)){conditions.push('status=?');args.push(status);}if(/^\d{4}-\d{2}-\d{2}$/.test(start)){conditions.push('created_at>=?');args.push(start+'T00:00:00');}if(/^\d{4}-\d{2}-\d{2}$/.test(end)){conditions.push('created_at<?');args.push(end+'T23:59:59.999Z');}const where=conditions.length?'WHERE '+conditions.join(' AND '):'';const items=db.prepare(`SELECT id,protocol,citizen_name,cpf,service,status,archived_at,created_at,(SELECT COUNT(*) FROM files WHERE request_id=requests.id) as file_count FROM requests ${where} ORDER BY created_at DESC LIMIT 500`).all(...args);res.json({items});});
 app.get('/api/dashboard',auth,(req,res)=>{const start=String(req.query.start||''),end=String(req.query.end||'');let where='',args=[];if(/^\d{4}-\d{2}-\d{2}$/.test(start)){where+=' AND created_at>=?';args.push(start+'T00:00:00');}if(/^\d{4}-\d{2}-\d{2}$/.test(end)){where+=' AND created_at<=?';args.push(end+'T23:59:59.999Z');}let totals=db.prepare(`SELECT count(*) total,sum(CASE WHEN status='pendente' THEN 1 ELSE 0 END) pending,sum(CASE WHEN status='em_analise' THEN 1 ELSE 0 END) analyzing,sum(CASE WHEN status='concluido' THEN 1 ELSE 0 END) done FROM requests WHERE 1=1 ${where}`).get(...args);let monthly=db.prepare(`SELECT substr(created_at,1,7) label,count(*) value FROM requests WHERE 1=1 ${where} GROUP BY label ORDER BY label`).all(...args);let services=db.prepare(`SELECT service label,count(*) value FROM requests WHERE 1=1 ${where} GROUP BY service ORDER BY value DESC`).all(...args);res.json({totals,monthly,services});});
 function findRequest(req,res,next){req.entry=db.prepare('SELECT * FROM requests WHERE id=?').get(Number(req.params.id));if(!req.entry)return res.status(404).json({error:'Solicitação não encontrada.'});next();}
 // Contingência DETRAN: registro interno, sem transmissão ao órgão externo.
@@ -306,7 +320,7 @@ function ensureAppeal(req,res,next){if(req.entry.service!=='Recurso de multa')re
 app.get('/api/requests/:id/contingency',auth,findRequest,ensureAppeal,(req,res)=>res.json({contingency:contingencyFor(req.entry.id)}));
 app.post('/api/requests/:id/contingency',auth,adminOnly,findRequest,ensureAppeal,(req,res)=>{
   if(process.env.STAGING==='1'&&!internalPilot)return res.status(403).json({error:'Habilite primeiro o piloto interno.'});
-  const reason=String(req.body?.reason||'').trim();
+  const reason=typeof req.body?.reason==='string'?req.body.reason.trim():'';
   if(reason.length<12||reason.length>500)return res.status(400).json({error:'Descreva o motivo da contingência (12 a 500 caracteres).'});
   let started=false;
   try{
@@ -373,6 +387,91 @@ app.get('/api/requests/:id/contingency.pdf',auth,findRequest,ensureAppeal,async(
 });
 app.get('/api/requests/:id',auth,findRequest,(req,res)=>{const files=db.prepare('SELECT id,original_name,mime,size FROM files WHERE request_id=?').all(req.entry.id);res.json({entry:req.entry,files});});
 app.patch('/api/requests/:id',auth,adminOnly,findRequest,(req,res)=>{if(!['pendente','em_analise','concluido'].includes(req.body.status))return res.status(400).json({error:'Status inválido.'});db.prepare('UPDATE requests SET status=?,updated_at=? WHERE id=?').run(req.body.status,new Date().toISOString(),req.entry.id);db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES (?,?,?,?)').run(req.user.id,req.entry.id,'status:'+req.body.status,new Date().toISOString());res.json({ok:true});});
+
+// NAVEDOCS-2026-11-16: protocolo manuscrito registrado e vinculado ao recebimento.
+// Registros internos NÃO são protocolo oficial DETRAN.
+db.exec(`CREATE TABLE IF NOT EXISTS paper_appeal_receipts (
+ id INTEGER PRIMARY KEY, request_id INTEGER NOT NULL UNIQUE REFERENCES requests(id),
+ paper_number TEXT NOT NULL UNIQUE, received_at TEXT NOT NULL,
+ category TEXT NOT NULL, phone TEXT, email TEXT, vehicle_plate TEXT, ait_number TEXT,
+ documents_json TEXT NOT NULL, notes TEXT NOT NULL, signed_on_paper INTEGER NOT NULL DEFAULT 0,
+ created_by INTEGER NOT NULL REFERENCES users(id), created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS privileged_request_actions (
+ id INTEGER PRIMARY KEY, request_id INTEGER NOT NULL REFERENCES requests(id),
+ actor_id INTEGER NOT NULL REFERENCES users(id), action TEXT NOT NULL,
+ reason TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, at TEXT NOT NULL
+);`);
+if(!db.prepare('PRAGMA table_info(requests)').all().some(x=>x.name==='archived_at')){
+ db.exec('ALTER TABLE requests ADD COLUMN archived_at TEXT');
+}
+function superOnly(req,res,next){
+ if(req.user?.role!=='superadmin')return res.status(403).json({error:'Operação reservada ao superadministrador.'});
+ const user=db.prepare('SELECT password_hash FROM users WHERE id=?').get(req.user.id);
+ const password=req.body?.password;
+ if(!user||typeof password!=='string'||password.length>128||!checkPassword(password,user.password_hash))
+  return res.status(403).json({error:'Confirme a sua senha atual para autorizar a operação.'});
+ const reason=typeof req.body?.reason==='string'?req.body.reason.trim():'';
+ if(reason.length<12||reason.length>500)return res.status(400).json({error:'Justificativa obrigatória (12 a 500 caracteres).'});
+ req.actionReason=reason;next();
+}
+app.get('/api/requests/:id/manual',auth,findRequest,ensureAppeal,(req,res)=>{
+ const x=db.prepare(`SELECT m.*,u.username AS recorded_by FROM paper_appeal_receipts m
+ JOIN users u ON u.id=m.created_by WHERE m.request_id=?`).get(req.entry.id);
+ res.json({manual:x?{...x,documents:JSON.parse(x.documents_json)}:null});
+});
+app.post('/api/requests/:id/manual',auth,adminOnly,findRequest,ensureAppeal,(req,res)=>{
+ if(process.env.STAGING==='1'&&!internalPilot)return res.status(403).json({error:'Registro manual indisponível fora do piloto interno.'});
+ const v=req.body||{},number=String(v.paper_number||'').trim(),dt=String(v.received_at||'').trim();
+ const category=String(v.category||'');
+ const docs=v.documents===undefined?[]:Array.isArray(v.documents)?[...new Set(v.documents)]:null;
+ const allowed=['Requerimento/formulário','Documento de identificação','CNH','CRLV','Notificação/AIT','Comprovantes','Outros'];
+ const notes=String(v.notes||'').trim(),phone=String(v.phone||'').trim(),email=String(v.email||'').trim();
+ const plate=String(v.vehicle_plate||'').trim().toUpperCase(),ait=String(v.ait_number||'').trim();
+ if(!/^[A-Za-z0-9][A-Za-z0-9./_-]{2,39}$/.test(number)||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(dt)||!Number.isFinite(Date.parse(dt))||new Date(dt).toISOString()!==dt||
+ !['Defesa de autuação','Indicação de condutor','Outro'].includes(category)||!docs||docs.some(x=>!allowed.includes(x))||docs.length>7||
+ notes.length>1000||phone.length>30||email.length>120||plate.length>12||ait.length>40)
+ return res.status(400).json({error:'Revise número, data, serviço e informações do protocolo manual.'});
+ if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return res.status(400).json({error:'E-mail inválido.'});
+ try{
+  db.exec('BEGIN IMMEDIATE');
+  const now=new Date().toISOString();
+  db.prepare(`INSERT INTO paper_appeal_receipts(request_id,paper_number,received_at,category,phone,email,vehicle_plate,ait_number,documents_json,notes,signed_on_paper,created_by,created_at)
+   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.entry.id,number,new Date(dt).toISOString(),category,phone,email,plate,ait,JSON.stringify(docs),notes,v.signed_on_paper===true?1:0,req.user.id,now);
+  db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES(?,?,?,?)').run(req.user.id,req.entry.id,'paper-manual-registered:'+number,now);
+  db.exec('COMMIT');res.status(201).json({ok:true});
+ }catch(err){try{db.exec('ROLLBACK')}catch{}
+  if([1555,2067].includes(err.errcode))return res.status(409).json({error:'Já existe protocolo manual para esta solicitação ou este número.'});
+  console.error('Erro ao registrar protocolo manual',err);res.status(500).json({error:'Falha ao registrar o protocolo.'});}
+});
+app.patch('/api/requests/:id/correct',auth,findRequest,superOnly,(req,res)=>{
+ const v=req.body||{},changes={};
+ if(v.citizen_name!==undefined){const x=String(v.citizen_name).trim();if(x.length<3||x.length>120)return res.status(400).json({error:'Nome inválido.'});changes.citizen_name=x;}
+ if(v.cpf!==undefined){const x=normalizeCpf(v.cpf);if(!validCpf(x))return res.status(400).json({error:'CPF inválido.'});changes.cpf=x;}
+ if(v.service!==undefined){const x=String(v.service);if(!SERVICES.includes(x))return res.status(400).json({error:'Serviço inválido.'});
+ if(x!=='Recurso de multa' && req.entry.service==='Recurso de multa' && (contingencyFor(req.entry.id)||db.prepare('SELECT 1 FROM paper_appeal_receipts WHERE request_id=?').get(req.entry.id)))return res.status(409).json({error:'Não é possível alterar o serviço com registros de contingência vinculados.'});
+ changes.service=x;}
+ if(!Object.keys(changes).length)return res.status(400).json({error:'Nenhuma alteração informada.'});
+ let active=false;
+ try{db.exec('BEGIN IMMEDIATE');active=true;
+ const now=new Date().toISOString();
+ for(const [key,value] of Object.entries(changes))db.prepare(`UPDATE requests SET ${key}=?,updated_at=? WHERE id=?`).run(value,now,req.entry.id);
+ db.prepare('INSERT INTO privileged_request_actions(request_id,actor_id,action,reason,before_json,after_json,at) VALUES(?,?,?,?,?,?,?)').run(req.entry.id,req.user.id,'correction',req.actionReason,JSON.stringify({citizen_name:req.entry.citizen_name,cpf:req.entry.cpf,service:req.entry.service}),JSON.stringify(changes),now);
+ db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES(?,?,?,?)').run(req.user.id,req.entry.id,'privileged-request-correction',now);
+ db.exec('COMMIT');res.json({ok:true});
+ }catch(e){if(active)try{db.exec('ROLLBACK')}catch{}console.error('Erro na correção autorizada',e);res.status(500).json({error:'Não foi possível salvar a correção.'});}
+});
+app.post('/api/requests/:id/archive',auth,findRequest,superOnly,(req,res)=>{
+ const archive=req.body?.archive===true;if(typeof req.body?.archive!=='boolean')return res.status(400).json({error:'Informe archive=true ou false.'});
+ let active=false;try{db.exec('BEGIN IMMEDIATE');active=true;const now=new Date().toISOString();
+ const after=archive?now:null;
+ db.prepare('UPDATE requests SET archived_at=?,updated_at=? WHERE id=?').run(after,now,req.entry.id);
+ db.prepare('INSERT INTO privileged_request_actions(request_id,actor_id,action,reason,before_json,after_json,at) VALUES(?,?,?,?,?,?,?)').run(req.entry.id,req.user.id,archive?'archive':'restore',req.actionReason,JSON.stringify({archived_at:req.entry.archived_at}),JSON.stringify({archived_at:after}),now);
+ db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES(?,?,?,?)').run(req.user.id,req.entry.id,archive?'privileged-request-archived':'privileged-request-restored',now);
+ db.exec('COMMIT');res.json({ok:true});
+ }catch(e){if(active)try{db.exec('ROLLBACK')}catch{}console.error('Erro no arquivamento',e);res.status(500).json({error:'Não foi possível alterar o arquivamento.'});}
+});
+
 function getFile(req,res,next){req.fileInfo=db.prepare('SELECT f.* FROM files f JOIN requests r ON r.id=f.request_id WHERE f.id=? AND r.id=?').get(Number(req.params.fileId),Number(req.params.id));if(!req.fileInfo)return res.status(404).json({error:'Arquivo não encontrado.'});next();}
 app.get('/api/requests/:id/files/:fileId',auth,getFile,(req,res)=>{const f=req.fileInfo;res.setHeader('Content-Type',f.mime);res.setHeader('Content-Disposition',(req.query.download==='1'?'attachment':'inline')+'; filename="documento'+path.extname(f.disk_name)+'"');res.setHeader('Cache-Control','private, no-store');res.sendFile(path.join(storageDir,f.disk_name));});
 app.get('/api/requests/:id/zip',auth,findRequest,(req,res)=>{const files=db.prepare('SELECT * FROM files WHERE request_id=?').all(req.entry.id);res.set('Content-Type','application/zip');res.set('Content-Disposition',`attachment; filename="${req.entry.protocol}.zip"`);const zip=archiver('zip',{zlib:{level:6}});zip.on('error',()=>res.destroy());zip.pipe(res);files.forEach((f,i)=>zip.file(path.join(storageDir,f.disk_name),{name:String(i+1).padStart(2,'0')+'-'+path.basename(f.original_name).replace(/[^\w.\- ]/g,'_')}));zip.finalize();});
@@ -382,7 +481,7 @@ app.get('/api/qr.svg',auth,async(req,res)=>{const url=`${req.protocol}://${req.g
 app.get('/interno',(req,res)=>{
  if(!internalPilot)return res.status(404).send('Página indisponível.');
  const user=currentUser(req);
- if(!user || !['admin','atendente'].includes(user.role))return res.redirect(302,'/admin');
+ if(!user || !['admin','atendente','superadmin'].includes(user.role))return res.redirect(302,'/admin');
  res.setHeader('Cache-Control','private, no-store');
  res.sendFile(path.join(root,'public/index.html'));
 });
