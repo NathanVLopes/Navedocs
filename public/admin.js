@@ -59,7 +59,7 @@ if(state.role==='superadmin'){
  archive.disabled=true;try{await api('/api/requests/'+id+'/archive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archive:action,reason:reason.value,password:password.value})});feedback.className='notice success';feedback.textContent=action?'Solicitação arquivada.':'Solicitação restaurada.';password.value='';archive.textContent=action?'Restaurar solicitação':'Arquivar solicitação';entry.archived_at=action?new Date().toISOString():null;loadRequests();}
  catch(err){feedback.className='notice error';feedback.textContent=err.message;}finally{archive.disabled=false;}});
 }
-if(entry.service==='Recurso de multa'){
+if(['Recurso de multa','Recurso à JARI','Recurso ao CETRAN'].includes(entry.service)){
  const section=document.createElement('section');section.className='contingency-section';
  const title=document.createElement('h3');title.textContent='Contingência DETRAN';section.append(title);
  const description=document.createElement('p');description.className='smalltext';description.textContent='Protocolo interno de recebimento. Não substitui o protocolo oficial do DETRAN.';section.append(description);

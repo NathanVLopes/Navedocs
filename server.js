@@ -275,7 +275,9 @@ app.post('/api/me/password',auth,(req,res)=>{
  res.json({ok:true,reauthRequired:true});
 });
 
-const SERVICES=['Credencial de estacionamento','Defesa de autuação','Recurso de multa','Indicação de condutor','Outros documentos'];
+const APPEAL_SERVICES=['Recurso à JARI','Recurso ao CETRAN'];
+const isAppeal=service=>service==='Recurso de multa'||APPEAL_SERVICES.includes(service);
+const SERVICES=['Credencial de estacionamento para pessoa com deficiência (PcD)','Credencial de estacionamento para pessoa idosa','Defesa de autuação','Indicação de condutor',...APPEAL_SERVICES,'Outros documentos'];
 app.get('/api/services',(req,res)=>res.json({services:SERVICES}));
 const uploadAttempts=new Map();
 function publicLimit(req,res,next){const now=Date.now(),key=req.ip,history=(uploadAttempts.get(key)||[]).filter(t=>t>now-60*60*1000);if(history.length>=20)return res.status(429).json({error:'Limite de envios atingido. Tente mais tarde.'});history.push(now);uploadAttempts.set(key,history);next();}
@@ -316,7 +318,7 @@ function contingencyFor(id){return db.prepare(`SELECT c.*,u.username AS issued_b
   u2.username AS external_registered_by FROM detran_contingencies c
   JOIN users u ON u.id=c.created_by
   LEFT JOIN users u2 ON u2.id=c.external_recorded_by WHERE c.request_id=?`).get(id)||null;}
-function ensureAppeal(req,res,next){if(req.entry.service!=='Recurso de multa')return res.status(422).json({error:'Contingência disponível apenas para Recurso de multa.'});next();}
+function ensureAppeal(req,res,next){if(!isAppeal(req.entry.service))return res.status(422).json({error:'Contingência disponível apenas para recursos de multa.'});next();}
 app.get('/api/requests/:id/contingency',auth,findRequest,ensureAppeal,(req,res)=>res.json({contingency:contingencyFor(req.entry.id)}));
 app.post('/api/requests/:id/contingency',auth,adminOnly,findRequest,ensureAppeal,(req,res)=>{
   if(process.env.STAGING==='1'&&!internalPilot)return res.status(403).json({error:'Habilite primeiro o piloto interno.'});
@@ -364,7 +366,7 @@ app.get('/api/requests/:id/contingency.pdf',auth,findRequest,ensureAppeal,async(
   page.drawText('COMPROVANTE DE REGISTRO INTERNO DE CONTINGENCIA',{x:48,y:747,size:14,font:bold,color:blue});
   line('Protocolo interno: '+ascii(c.code),710,14,bold);
   line('Protocolo de recebimento NAVEDOCS: '+ascii(req.entry.protocol),682);
-  line('Tipo: Recurso de multa',660);
+  line(ascii('Tipo: '+req.entry.service),660);
   line('Nome: '+ascii(req.entry.citizen_name).slice(0,80),638);
   line('CPF: ***.***.***-'+String(req.entry.cpf).slice(-2),616);
   line('Recebimento no NAVEDOCS (UTC): '+req.entry.created_at,594);
@@ -449,7 +451,7 @@ app.patch('/api/requests/:id/correct',auth,findRequest,superOnly,(req,res)=>{
  if(v.citizen_name!==undefined){const x=String(v.citizen_name).trim();if(x.length<3||x.length>120)return res.status(400).json({error:'Nome inválido.'});changes.citizen_name=x;}
  if(v.cpf!==undefined){const x=normalizeCpf(v.cpf);if(!validCpf(x))return res.status(400).json({error:'CPF inválido.'});changes.cpf=x;}
  if(v.service!==undefined){const x=String(v.service);if(!SERVICES.includes(x))return res.status(400).json({error:'Serviço inválido.'});
- if(x!=='Recurso de multa' && req.entry.service==='Recurso de multa' && (contingencyFor(req.entry.id)||db.prepare('SELECT 1 FROM paper_appeal_receipts WHERE request_id=?').get(req.entry.id)))return res.status(409).json({error:'Não é possível alterar o serviço com registros de contingência vinculados.'});
+ if(x!==req.entry.service && isAppeal(req.entry.service) && (contingencyFor(req.entry.id)||db.prepare('SELECT 1 FROM paper_appeal_receipts WHERE request_id=?').get(req.entry.id)))return res.status(409).json({error:'Não é possível alterar o serviço com registros de contingência vinculados.'});
  changes.service=x;}
  if(!Object.keys(changes).length)return res.status(400).json({error:'Nenhuma alteração informada.'});
  let active=false;
