@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assessUpload, validNewAdminPassword} from '../production-policy.mjs';
+import {assessUpload, validNewAdminPassword} from './production-policy.mjs';
 const testSettings={staging:true,enableTestUploads:true,internalTests:true,realDataApproved:false};
 test('homologação sem permissão bloqueia qualquer envio',()=>{
  for(const testUploads of [true,false])for(const pilot of [true,false]){

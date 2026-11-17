@@ -8,3 +8,12 @@
 .pwa-offline h1{margin:20px 0 10px}
 .pwa-offline p{line-height:1.6;margin-bottom:24px}
 @media(max-width:700px){.header-actions{justify-content:flex-start}.pwa-install{width:100%}.pwa-offline{margin:8vh auto}}
+
+.user-avatar{display:inline-grid;place-items:center;vertical-align:middle;width:2rem;height:2rem;flex:none;margin-inline-end:.45rem;border-radius:50%;overflow:hidden;background:#e2edf5;color:#173354;font-weight:700;font-size:.75rem}
+.user-avatar img{width:100%;height:100%;object-fit:cover}
+#profile-avatar .user-avatar{width:3.5rem;height:3.5rem;margin-bottom:.75rem;font-size:1rem}
+
+.presence-avatar{display:inline-flex;align-items:center;gap:.25rem;margin-inline-end:.6rem}
+.presence-avatar .user-avatar{border:2px solid #697789;margin-inline-end:0}
+.presence-avatar.presence-online .user-avatar{border-color:#168047}
+.presence-label{font-size:.75rem}

@@ -1,0 +1,25 @@
+/* NAVEDOCS-2026-11-16: apresentação e impressão de indicadores reais */
+.report-presentation .sidebar,.report-presentation .admin-topbar{display:none}
+.report-presentation .admin-main{width:100%;min-height:100vh}
+.report-presentation .page{max-width:1700px;margin:auto;padding:30px 42px}
+.report-presentation .charts{margin-top:22px}
+.privileged-actions,.manual-form{border-top:1px solid #d8e2eb;margin-top:16px;padding-top:16px}
+.manual-form fieldset{display:flex;flex-wrap:wrap;gap:12px;border:1px solid #d5dfe8;border-radius:9px;padding:10px}
+.manual-form fieldset label{display:inline-flex;align-items:center;gap:3px}
+.manual-form .field{max-width:100%}
+@media print{
+ @page{size:A4 portrait;margin:14mm}
+ body{color:#111!important;background:#fff!important;font-family:Arial,sans-serif}
+ .sidebar,.admin-topbar,.filters,.dates,#print-report,#presentation-toggle,.sidebar-bottom,.btn,.navbtn,.header-actions{display:none!important}
+ body:has(#tab-dashboard:not(.hidden)):has(#app-view:not(.hidden)) #app-view,
+ body:has(#tab-dashboard:not(.hidden)):has(#app-view:not(.hidden)) :is(#tab-dashboard,.admin-main,.page){width:100%!important;max-width:none!important;padding:0!important;margin:0!important}
+ #tab-dashboard>.page-heading:before{content:'NAVETRAN · NAVEDOCS — RELATÓRIO DE ATENDIMENTOS';display:block;font-weight:700;font-size:15pt;margin-bottom:5mm;color:#102d4b}
+ .surface{box-shadow:none!important;border:1px solid #ccd5dc!important;break-inside:avoid}
+ .charts{display:grid!important;grid-template-columns:1fr!important;gap:8mm!important}
+ .chart-card{break-inside:avoid}
+ svg{max-width:100%!important}
+ .metrics{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:3mm!important}
+ .metric{padding:8px!important}.metric strong{font-size:18pt!important}
+ body:has(#tab-dashboard:not(.hidden)) dialog{display:none}
+}
+@media(max-width:700px){.report-presentation .page{padding:14px!important}}

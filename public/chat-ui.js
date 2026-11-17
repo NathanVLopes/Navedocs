@@ -8,13 +8,44 @@ async function request(url,options={}){
 }
 function node(tag,className,text){const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;}
 function timeText(value){try{return new Date(value).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});}catch{return value;}}
-function messageElement(message){
+export function userAvatar(id,name,revision=''){
+ const avatar=node('span','user-avatar',(name||'?').trim().slice(0,2).toLocaleUpperCase('pt-BR'));
+ avatar.setAttribute('aria-hidden','true');
+ if(id){
+  const image=document.createElement('img');
+  image.alt='';
+  image.addEventListener('load',()=>avatar.replaceChildren(image),{once:true});
+  image.src='/api/users/'+encodeURIComponent(id)+'/avatar'+(revision?'?v='+revision:'');
+ }
+ return avatar;
+}
+let onlineUsers=new Set();
+function renderPresence(label){
+ const online=onlineUsers.has(Number(label.dataset.presenceUser));
+ label.textContent=online?'Online':'Offline';
+ label.parentElement.classList.toggle('presence-online',online);
+}
+export function updatePresence(ids){
+ onlineUsers=new Set(ids);
+ document.querySelectorAll('[data-presence-user]').forEach(renderPresence);
+}
+export function presenceAvatar(id,name){
+ const item=node('span','presence-avatar');
+ const label=node('span','presence-label');
+ label.dataset.presenceUser=id;
+ item.append(userAvatar(id,name),label);
+ renderPresence(label);
+ return item;
+}
+function messageElement(message,showPresence){
  const row=node('article','chat-message '+(message.sender_type==='staff'?'chat-staff':'chat-citizen'));
  const meta=node('div','chat-message-meta',(message.sender|| (message.sender_type==='staff'?'Servidor NAVETRAN':'Cidadão'))+' · '+timeText(message.created_at));
+ if(message.sender_type==='staff')meta.prepend((showPresence?presenceAvatar:userAvatar)(message.sender_id,message.sender));
  const body=node('p','chat-message-body',message.body);
  row.append(meta,body);return row;
 }
 export function mountChat(container,url,title,isVisible=()=>true){
+ const renderMessage=message=>messageElement(message,url==='/api/staff/chat/team');
  let disposed=false,loading=false,first=true,oldest=null,hasMore=false,lastId=0;
  container.replaceChildren();
  const panel=node('section','chat-panel');const top=node('div','chat-panel-heading');
@@ -33,11 +64,11 @@ export function mountChat(container,url,title,isVisible=()=>true){
    const data=await request(url);
    if(disposed)return;
    const items=data.items||[];
-   if(first){list.replaceChildren(...items.map(messageElement));first=false;}
+   if(first){list.replaceChildren(...items.map(renderMessage));first=false;}
    else if(!items.length){list.replaceChildren();}
    else if(items[items.length-1].id!==lastId){
     // Recupera a janela recente, mesmo quando chegaram muitas mensagens.
-    list.replaceChildren(...items.map(messageElement));
+    list.replaceChildren(...items.map(renderMessage));
    }
    lastId=items.at(-1)?.id||0;
    oldest=items[0]?.id||null;hasMore=Boolean(data.hasMore);older.hidden=!hasMore;
@@ -50,7 +81,7 @@ export function mountChat(container,url,title,isVisible=()=>true){
   if(!oldest||disposed)return;older.disabled=true;
   try{const data=await request(url+'?before='+oldest);const prev=data.items||[];
    if(disposed)return;
-   const height=list.scrollHeight;list.prepend(...prev.map(messageElement));
+   const height=list.scrollHeight;list.prepend(...prev.map(renderMessage));
    list.scrollTop=list.scrollHeight-height;
    oldest=prev[0]?.id||oldest;hasMore=Boolean(data.hasMore);older.hidden=!hasMore;
   }catch(error){status.textContent=error.message;}finally{older.disabled=false;}
