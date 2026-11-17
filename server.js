@@ -431,6 +431,27 @@ app.get('/api/requests/:id/contingency.pdf',auth,findRequest,ensureAppeal,async(
   const bytes=await pdf.save();res.set({'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${c.code}.pdf"`,'Cache-Control':'private, no-store'});res.send(Buffer.from(bytes));
  }catch(err){console.error('Falha ao gerar comprovante',err);res.status(500).json({error:'Não foi possível gerar o comprovante.'});}
 });
+// Histórico autenticado e somente leitura, limitado aos últimos registros da auditoria.
+app.get('/api/requests/:id/history',auth,findRequest,(req,res)=>{
+  const items=db.prepare(`SELECT a.action,a.created_at,u.username
+    FROM audit a LEFT JOIN users u ON u.id=a.user_id
+    WHERE a.request_id=? ORDER BY a.created_at DESC,a.id DESC LIMIT 100`).all(req.entry.id);
+  const safeLabel=action=>{
+    if(action.startsWith('status:')){
+      const name={pendente:'Pendente',em_analise:'Em análise',concluido:'Concluído'}[action.slice(7)];
+      return name?'Situação alterada para '+name:'Situação atualizada';
+    }
+    if(action.startsWith('detran-contingency-created:'))return 'Protocolo de contingência criado';
+    if(action==='detran-external-protocol-recorded')return 'Protocolo externo vinculado';
+    if(action.includes('archive'))return 'Arquivamento ou restauração registrado';
+    if(action.includes('correct'))return 'Dados da solicitação corrigidos';
+    if(action.includes('manual'))return 'Protocolo manual registrado';
+    return 'Ação administrativa registrada';
+  };
+  res.set('Cache-Control','private, no-store');
+  res.json({items:[{label:'Solicitação recebida',created_at:req.entry.created_at,username:'NAVEDOCS'},
+    ...items.reverse().map(a=>({label:safeLabel(a.action),created_at:a.created_at,username:a.username||'Sistema'}))]});
+});
 app.get('/api/requests/:id',auth,findRequest,(req,res)=>{const files=db.prepare('SELECT id,original_name,mime,size FROM files WHERE request_id=?').all(req.entry.id);res.json({entry:req.entry,files});});
 app.patch('/api/requests/:id',auth,adminOnly,findRequest,(req,res)=>{if(!['pendente','em_analise','concluido'].includes(req.body.status))return res.status(400).json({error:'Status inválido.'});db.prepare('UPDATE requests SET status=?,updated_at=? WHERE id=?').run(req.body.status,new Date().toISOString(),req.entry.id);db.prepare('INSERT INTO audit(user_id,request_id,action,created_at) VALUES (?,?,?,?)').run(req.user.id,req.entry.id,'status:'+req.body.status,new Date().toISOString());res.json({ok:true});});
 

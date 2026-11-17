@@ -1,4 +1,9 @@
 import {mountChat,showUnread,userAvatar,presenceAvatar,updatePresence} from '/chat-ui.js';
+import '/detail-layout.js';
+const detailStyles=document.createElement('link');
+detailStyles.rel='stylesheet';
+detailStyles.href='/detail-layout.css';
+document.head.append(detailStyles);
 const $=s=>document.querySelector(s),state={start:'',end:'',tab:'dashboard',items:[],role:'atendente'};
 async function api(url,opt={}){let r=await fetch(url,{credentials:'same-origin',...opt});let d=await r.json().catch(()=>({}));if(r.status===401 && url!=='/api/login'){setLoggedOut();throw Error('Sessão expirada. Faça login novamente.');}if(!r.ok)throw Error(d.error||'Não foi possível completar a operação.');return d;}
 function setLoggedOut(){updatePresence([]);setPresentation(false);$('#login-view').classList.remove('hidden');$('#app-view').classList.add('hidden');}
