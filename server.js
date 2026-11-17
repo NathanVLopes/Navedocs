@@ -147,6 +147,20 @@ app.delete('/api/me/avatar',auth,(req,res)=>{
  db.prepare('DELETE FROM user_avatars WHERE user_id=?').run(req.user.id);
  res.json({ok:true});
 });
+db.exec(`CREATE TABLE IF NOT EXISTS session_presence (
+ token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE,
+ seen_at INTEGER NOT NULL
+)`);
+app.post('/api/me/presence',auth,(req,res)=>{
+ const token=req.headers.cookie.match(/(?:^|; )navedocs_session=([a-f0-9]{64})/)[1];
+ const now=Date.now(), cutoff=now-60000;
+ db.prepare('DELETE FROM session_presence WHERE seen_at<=?').run(cutoff);
+ db.prepare(`INSERT INTO session_presence(token_hash,seen_at) VALUES(?,?)
+  ON CONFLICT(token_hash) DO UPDATE SET seen_at=excluded.seen_at`).run(sha256(token),now);
+ const online=db.prepare(`SELECT DISTINCT s.user_id FROM session_presence p
+  JOIN sessions s ON s.token_hash=p.token_hash WHERE s.expires_at>?`).all(now);
+ res.set('Cache-Control','private, no-store').json({online:online.map(row=>row.user_id)});
+});
 app.get('/api/me',auth,(req,res)=>res.json({user:req.user}));
 
 // Ativação independente do upload público: chat desligado por padrão até revisão do piloto.
