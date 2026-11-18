@@ -1,3 +1,4 @@
+import './receipt-page.js';
 const form=document.querySelector('#request-form'), files=document.querySelector('#documents'),message=document.querySelector('#form-message');
 document.querySelector('#cpf').addEventListener('input',e=>{let v=e.target.value.replace(/\D/g,'').slice(0,11);e.target.value=v.replace(/^(\d{3})(\d)/,'$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1-$2')});
 files.addEventListener('change',()=>{document.querySelector('#file-list').replaceChildren(...Array.from(files.files).map(f=>{const li=document.createElement('li');li.textContent=`${f.name} (${(f.size/1024/1024).toFixed(1)} MB)`;return li;}));});

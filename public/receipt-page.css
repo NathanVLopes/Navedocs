@@ -1,0 +1,65 @@
+/* Confirmação NAVEDOCS — escopo exclusivo da tela de recebimento */
+body.receipt-mode .public-main {
+  display: block;
+  width: min(100%, 1040px);
+  margin: 34px auto 64px;
+  padding: 0 28px;
+}
+body.receipt-mode .hero { display: none; }
+body.receipt-mode .form-card {
+  padding: clamp(24px, 4.5vw, 56px);
+  max-width: 880px;
+  margin: 0 auto;
+  border-radius: 16px;
+  box-shadow: 0 10px 35px rgb(22 46 68 / 5%);
+}
+.receipt-v3 { color: #18314d; }
+.receipt-top { display: flex; align-items: flex-start; gap: 20px; padding-bottom: 28px; border-bottom: 1px solid #e2e8ee; }
+.receipt-symbol {
+  display: grid; place-items: center; flex: 0 0 48px; height: 48px;
+  border: 2px solid #0f7658; border-radius: 50%;
+  color: #0f7658; font-weight: 800; font-size: 26px; line-height: 1;
+}
+.receipt-eyebrow { font-size: 11px; letter-spacing: 1.5px; font-weight: 800; color: #176c5a; margin: 0 0 8px; }
+.receipt-heading h1 { font-size: clamp(23px, 3.4vw, 33px); color: #102d4b; line-height: 1.15; margin: 0 0 12px; letter-spacing: -.6px; }
+.receipt-heading h1:focus { outline: none; }
+.receipt-heading p:last-child { font-size: 14px; line-height: 1.6; color: #64778b; margin: 0; max-width: 590px; }
+.receipt-fields { margin-top: 28px; display: grid; gap: 16px; }
+.receipt-field { border: 1px solid #dbe5ec; background: #fff; border-radius: 12px; padding: 20px 22px; min-width: 0; }
+.receipt-field-private { background: #f6f9fc; }
+.receipt-field-label { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.receipt-field-label h2 { margin: 0; font-size: 14px; color: #173650; }
+.receipt-field-hint { font-size: 12px; color: #687d90; }
+.receipt-field-value { display: flex; align-items: center; gap: 15px; margin-top: 16px; min-width: 0; }
+.receipt-field-value strong { font-size: clamp(18px, 3.3vw, 26px); color: #102d4b; letter-spacing: .5px; overflow-wrap: anywhere; min-width: 0; }
+.receipt-field-value code {
+  font: 600 14px/1.75 ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  color: #183b59; overflow-wrap: anywhere; word-break: break-all; min-width: 0; flex: 1;
+}
+.receipt-code-row { align-items: flex-start; }
+.receipt-copy {
+  flex: none; min-height: 39px; padding: 8px 15px;
+  color: #185f90; background: #fff; border: 1px solid #b9cddd; border-radius: 8px;
+  font: inherit; font-size: 13px; font-weight: 750; cursor: pointer;
+}
+.receipt-copy:hover { background: #eaf3f9; }
+.receipt-copy:focus-visible { outline: 3px solid #f8be36; outline-offset: 2px; }
+.receipt-privacy { border-top: 1px solid #e1e9f0; padding-top: 12px; margin: 16px 0 0; font-size: 12px; line-height: 1.65; color: #586e81; }
+.receipt-feedback { font-size: 13px; color: #176c5a; min-height: 1.4em; padding-top: 10px; }
+.receipt-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.receipt-actions .btn { text-decoration: none; font-size: 14px; }
+.receipt-main-action { min-width: 250px; }
+.receipt-legal { font-size: 12px; line-height: 1.65; color: #718497; margin: 27px 0 0; padding-top: 20px; border-top: 1px solid #e2e8ee; }
+@media (max-width: 650px) {
+  body.receipt-mode .public-main { padding: 0 14px; margin: 14px auto 34px; }
+  body.receipt-mode .form-card { padding: 22px 17px; }
+  .receipt-top { gap: 12px; padding-bottom: 22px; }
+  .receipt-symbol { flex-basis: 38px; height: 38px; font-size: 21px; }
+  .receipt-fields { margin-top: 20px; }
+  .receipt-field { padding: 16px; }
+  .receipt-field-value { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .receipt-copy { width: 100%; }
+  .receipt-actions { flex-direction: column; }
+  .receipt-actions .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .receipt-v3 *, .receipt-v3 *::before, .receipt-v3 *::after { animation: none !important; transition: none !important; } }
