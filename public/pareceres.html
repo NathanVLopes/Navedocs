@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#102d4b">
+  <meta name="robots" content="noindex,nofollow">
+  <title>NAVEDOCS | Pareceres administrativos</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/pareceres.css">
+</head>
+<body>
+  <header class="header">
+    <div class="identity">
+      <span class="symbol" aria-hidden="true">⚖</span>
+      <div><strong>Pareceres administrativos</strong><small>NAVEDOCS · NAVETRAN</small></div>
+    </div>
+    <span class="draft">Somente minutas · Sem aprovação automática</span>
+    <a href="/admin">Voltar ao painel</a>
+  </header>
+  <main class="shell">
+    <aside class="side" aria-label="Pareceres salvos">
+      <div class="side-head">
+        <h1>Meus pareceres</h1>
+        <button class="btn primary" type="button" id="new">Novo parecer</button>
+      </div>
+      <p>Rascunhos armazenados no sistema. A decisão e a assinatura dependem de revisão humana.</p>
+      <div id="items" aria-live="polite"></div>
+    </aside>
+    <div class="work">
+      <form id="editor" autocomplete="off">
+        <div class="top">
+          <div><div class="eyebrow">ANÁLISE DE DEFESA DE AUTUAÇÃO</div><h2 id="editing-title">Novo parecer</h2><p>Confira os dados do AIT antes de redigir a fundamentação.</p></div>
+          <span class="tag">Rascunho</span>
+        </div>
+        <section class="section" aria-labelledby="heading-origem">
+          <h3 id="heading-origem"><span>01</span> Identificação do processo</h3>
+          <p>Vincular a uma solicitação é opcional. O identificador deve ser o ID interno da solicitação no NAVEDOCS, não seu número de protocolo.</p>
+          <label>ID da solicitação (opcional)<input name="requestId" type="number" min="1" step="1" placeholder="Ex.: 123"></label>
+          <div class="fields" id="fields"></div>
+          <label>Quem apresentou a defesa?
+            <select id="requerente-tipo" name="requerenteTipo">
+              <option value="proprietario">Proprietário</option>
+              <option value="condutor">Condutor</option>
+              <option value="outro">Representante ou outro requerente</option>
+            </select>
+          </label>
+          <div class="actions"><button class="btn" type="button" id="use-name">Preencher requerente conforme seleção</button></div>
+        </section>
+        <section class="section" aria-labelledby="heading-resultado">
+          <h3 id="heading-resultado"><span>02</span> Resultado e fundamento</h3>
+          <p>Selecione a classificação administrativa para a minuta. O sistema não decide automaticamente.</p>
+          <div class="fields">
+            <label>Resultado
+              <select id="resultado" name="resultado">
+                <option value="indeferido">Indeferido</option>
+                <option value="deferido">Deferido</option>
+                <option value="nao_conhecido">Não conhecido / inadmissível</option>
+              </select>
+            </label>
+            <label>Motivo principal<select id="motivo" name="motivo"></select></label>
+          </div>
+          <p class="note">O fundamento deve ser confirmado com base nos autos e nas normas aplicáveis. Intempestividade e ilegitimidade são tratadas como questões de admissibilidade.</p>
+        </section>
+        <section class="section" aria-labelledby="heading-ait">
+          <h3 id="heading-ait"><span>03</span> Auto de Infração</h3>
+          <p>Salve o parecer antes de anexar. O arquivo original será preservado em armazenamento privado e incluído na minuta PDF.</p>
+          <label class="upload" for="ait-upload">Selecionar AIT original em PDF, JPG ou PNG
+            <small>Máximo 10 MB · Um arquivo por parecer</small>
+            <input id="ait-upload" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+          </label>
+          <div class="actions">
+            <button class="btn" id="upload-button" type="button">Anexar AIT</button>
+            <a id="ait-download" class="btn" href="#" hidden>Baixar AIT</a>
+          </div>
+          <p id="upload-status" role="status" aria-live="polite">Nenhum AIT anexado</p>
+          <details>
+            <summary>Extrair campos de texto copiado do AIT (sem OCR)</summary>
+            <label>Texto copiado do documento
+              <textarea id="ait-text" rows="6" maxlength="120000" placeholder="Cole o texto extraído de um PDF pesquisável. Imagens digitalizadas ainda exigem preenchimento manual."></textarea>
+            </label>
+            <button class="btn" id="extract" type="button">Sugerir campos</button>
+          </details>
+        </section>
+        <section class="section" aria-labelledby="heading-redacao">
+          <h3 id="heading-redacao"><span>04</span> Redação do parecer</h3>
+          <p>Os textos permanecem editáveis. Nada será aprovado ou assinado automaticamente.</p>
+          <div class="textareas">
+            <label>Relatório<textarea name="relatorio" rows="6" maxlength="10000"></textarea></label>
+            <label>Tese defensiva<textarea name="tese" rows="6" maxlength="10000"></textarea></label>
+            <label>Parecer / Fundamentação<textarea name="fundamentacao" rows="9" maxlength="10000"></textarea></label>
+            <label>Conclusão<textarea name="conclusao" rows="6" maxlength="10000"></textarea></label>
+            <label>Observações<textarea name="observacoes" rows="3" maxlength="10000"></textarea></label>
+          </div>
+          <details id="history" hidden>
+            <summary>Histórico das alterações</summary>
+            <div id="audit" class="history"></div>
+          </details>
+        </section>
+        <div class="bottom">
+          <span>O PDF gerado será identificado como MINUTA, sem validade de decisão assinada.</span>
+          <div class="actions">
+            <button class="btn primary" type="submit" id="save">Salvar rascunho</button>
+            <button class="btn" type="button" id="pdf">Gerar minuta em PDF</button>
+          </div>
+        </div>
+        <p id="notice" role="status" aria-live="polite" style="margin:0 32px 20px"></p>
+      </form>
+    </div>
+  </main>
+  <script type="module" src="/pareceres.js"></script>
+</body>
+</html>
