@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { PDFDocument } from 'pdf-lib';
 import archiver from 'archiver';
 import QRCode from 'qrcode';
+import { registerParecerRoutes } from './pareceres/server.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -555,6 +556,7 @@ app.get('/interno',(req,res)=>{
 // Portal público e painel administrativo têm rotas independentes.
 // O piloto interno continua protegido por autenticação no servidor.
 app.get('/acompanhar',(req,res)=>{if(!chatEnabled)return res.status(503).send('Chat ainda não habilitado.');res.setHeader('Cache-Control','private, no-store');res.sendFile(path.join(root,'public/acompanhar.html'));});
+registerParecerRoutes({app,db,auth,root,privateRoot});
 app.use(express.static(path.join(root,'public'),{index:'index.html',maxAge:0}));app.get('/admin',(req,res)=>res.sendFile(path.join(root,'public/admin.html')));
 app.use((err,req,res,next)=>{if(err instanceof multer.MulterError)return res.status(400).json({error:'Limite de arquivos excedido (máximo 8 arquivos de até 10 MB cada).'});console.error(err);res.status(500).json({error:'Erro interno.'});});
 app.listen(port,()=>console.log(`NAVEDOCS disponível em http://localhost:${port}`));
