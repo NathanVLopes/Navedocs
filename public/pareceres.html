@@ -74,6 +74,16 @@
             <a id="ait-download" class="btn" href="#" hidden>Baixar AIT</a>
           </div>
           <p id="upload-status" role="status" aria-live="polite">Nenhum AIT anexado</p>
+          <div class="ocr-tools">
+            <button class="btn primary" id="ocr-run" type="button" disabled>Reconhecer dados do AIT</button>
+            <p id="ocr-notice" role="status" aria-live="polite">Após anexar o auto, o sistema tentará ler os dados automaticamente.</p>
+          </div>
+          <section id="ocr-review" class="ocr-review" aria-label="Conferência dos campos extraídos" hidden>
+            <h4>Confira os dados encontrados</h4>
+            <p>Somente os campos marcados serão preenchidos. Você pode corrigir o texto sugerido antes de aplicar.</p>
+            <div id="ocr-review-rows" class="ocr-review-rows"></div>
+            <div class="actions"><button class="btn primary" type="button" id="ocr-apply">Aplicar campos selecionados</button><button class="btn" type="button" id="ocr-cancel">Descartar sugestões</button></div>
+          </section>
           <details>
             <summary>Extrair campos de texto copiado do AIT (sem OCR)</summary>
             <label>Texto copiado do documento

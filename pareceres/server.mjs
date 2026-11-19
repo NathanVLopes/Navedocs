@@ -1,3 +1,4 @@
+import { registerAitOcrRoutes } from './ocr-routes.mjs';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -94,6 +95,7 @@ export function registerParecerRoutes({app,db,auth,root,privateRoot}){
   try {const bytes=await generateParecerPdf(req.parecer,directory);res.set({'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="parecer-minuta-${req.parecer.id}.pdf"`,'Cache-Control':'private, no-store'});res.send(Buffer.from(bytes));audit(req.parecer.id,req.user.id,'minuta_pdf');}
   catch(e){console.error('Erro na geração do parecer',e);res.status(422).json({error:'Não foi possível gerar o PDF. Confira o AIT e os campos.'});}
  });
+ registerAitOcrRoutes({app,auth,lookup,privateRoot,directory,audit});
 }
 
 const W=595.28,H=841.89,M=44;
